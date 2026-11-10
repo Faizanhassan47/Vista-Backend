@@ -49,8 +49,11 @@ def _client():
             503,
             "iDrive e2 is enabled but IDRIVE_E2_ACCESS_KEY_ID and IDRIVE_E2_SECRET_ACCESS_KEY are empty",
         )
-    import boto3
-    from botocore.client import Config
+    try:
+        import boto3
+        from botocore.client import Config
+    except ModuleNotFoundError as exc:
+        raise HTTPException(503, "iDrive e2 is enabled but boto3 is not installed") from exc
 
     return boto3.client(
         "s3",

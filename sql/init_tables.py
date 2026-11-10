@@ -169,6 +169,14 @@ def init_db(connect_fn):
                 qc_timestamp DATETIME
             )
         ''')
+        db.execute("""
+            DECLARE @constraint sysname;
+            SELECT @constraint = name FROM sys.check_constraints
+            WHERE parent_object_id = OBJECT_ID('dbo.slides') AND definition LIKE '%file_type%' AND definition NOT LIKE '%dicom-stack%';
+            IF @constraint IS NOT NULL EXEC('ALTER TABLE dbo.slides DROP CONSTRAINT ' + @constraint);
+            IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID('dbo.slides') AND definition LIKE '%dicom-stack%')
+                ALTER TABLE dbo.slides ADD CONSTRAINT CK_slides_file_type CHECK (file_type IN ('raster', 'wsi', 'dicom-wsi', 'dicom-stack', 'nifti'));
+        """)
         slide_columns = {row['name'] for row in db.execute("SELECT COLUMN_NAME as name FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='slides'")}
         for name, definition in {
             "qc_status": "TEXT",

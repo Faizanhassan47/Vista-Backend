@@ -672,10 +672,17 @@ def create_patient_router(connect, require_roles, audit, uploads_dir: Path):
         filenames = [row["filename"] for row in slides if row.get("filename")]
         if case_row and case_row.get("filename"):
             filenames.append(case_row["filename"])
+        storage_warning = None
         if patient:
             for filename in set(filenames):
-                relocate_case_file(filename, patient["cnic"], patient["display_label"])
-        return {"id":accession_id,"patient_id":patient_id,**item.model_dump()}
+                try:
+                    relocate_case_file(filename, patient["cnic"], patient["display_label"])
+                except HTTPException as exc:
+                    storage_warning = str(exc.detail)
+        body = {"id": accession_id, "patient_id": patient_id, **item.model_dump()}
+        if storage_warning:
+            body["storage_warning"] = storage_warning
+        return body
 
     @router.get("/{patient_id}/cases")
     def patient_cases(patient_id: int, search: str="", status: str|None=None, date_from: date|None=None, date_to: date|None=None, page:int=Query(1,ge=1), page_size:int=Query(25,ge=1,le=100), _=Depends(require_roles(READ_ROLES))):
