@@ -829,7 +829,7 @@ def create_cases_router(
         })
 
     @router.get("/api/slides/{slide_id}/radiology/volume", dependencies=[Depends(require_roles(CLINICAL_READ_ROLES))])
-    def radiology_volume(slide_id: int, quality: str = Query("balanced"), current_user: dict = Depends(get_current_user)):
+    def radiology_volume(slide_id: int, quality: str = Query("preview"), current_user: dict = Depends(get_current_user)):
         slide, metadata = _radiology_record(slide_id, current_user)
         path = stored_path_fn(slide["filename"])
         try:
@@ -853,7 +853,7 @@ def create_cases_router(
             "X-Preview": "1" if info["preview"] else "0",
             "X-Quality": str(info.get("quality") or quality),
             "X-Order": info["order"],
-            "Cache-Control": "private, max-age=60",
+            "Cache-Control": "private, max-age=300",
         })
 
     @router.get("/api/slides/{slide_id}/image", dependencies=[Depends(require_roles(CLINICAL_READ_ROLES))])

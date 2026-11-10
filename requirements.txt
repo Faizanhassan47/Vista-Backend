@@ -13,6 +13,10 @@ pyjwt
 python-dotenv
 pyodbc
 pydicom
+pylibjpeg
+pylibjpeg-libjpeg
+pylibjpeg-openjpeg
+nibabel
 pystrich
 boto3
 pydantic-settings

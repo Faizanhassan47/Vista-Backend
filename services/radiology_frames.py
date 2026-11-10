@@ -223,8 +223,29 @@ def render_nifti_slice(path, plane: str, index: int, center: float | None, width
 
 
 TRUSTED_HU_SOURCES = {"dicom_conversion_metadata", "verified_source_series", "vista_calibration_record"}
-MAX_VOLUME_VOXELS = 16_000_000
-QUALITY_VOXELS = {"preview": 2_000_000, "balanced": 6_000_000, "high": MAX_VOLUME_VOXELS}
+# Keep 3D payloads small enough for browser volume ray casting.
+MAX_VOLUME_VOXELS = 8_000_000
+QUALITY_VOXELS = {"preview": 900_000, "balanced": 2_500_000, "high": MAX_VOLUME_VOXELS}
+_VOLUME_CACHE: dict[tuple, tuple[bytes, dict]] = {}
+_VOLUME_CACHE_LIMIT = 8
+
+
+def _volume_cache_get(key: tuple) -> tuple[bytes, dict] | None:
+    hit = _VOLUME_CACHE.get(key)
+    if hit is None:
+        return None
+    # Simple LRU bump.
+    _VOLUME_CACHE.pop(key, None)
+    _VOLUME_CACHE[key] = hit
+    return hit
+
+
+def _volume_cache_put(key: tuple, value: tuple[bytes, dict]) -> None:
+    _VOLUME_CACHE.pop(key, None)
+    _VOLUME_CACHE[key] = value
+    while len(_VOLUME_CACHE) > _VOLUME_CACHE_LIMIT:
+        oldest = next(iter(_VOLUME_CACHE))
+        _VOLUME_CACHE.pop(oldest, None)
 
 
 def nifti_calibration(metadata: dict | None) -> dict:
@@ -304,27 +325,44 @@ def _downsample(volume: np.ndarray, spacings: tuple[float, float, float], qualit
     return np.ascontiguousarray(reduced), spacing, True
 
 
-def nifti_volume_bytes(path, quality: str = "high") -> tuple[bytes, dict]:
+def nifti_volume_bytes(path, quality: str = "preview") -> tuple[bytes, dict]:
+    from pathlib import Path
     import nibabel as nib
+    path = Path(path)
+    chosen = quality if quality in QUALITY_VOXELS else "preview"
+    cache_key = ("nifti", str(path.resolve()), path.stat().st_mtime_ns, chosen)
+    cached = _volume_cache_get(cache_key)
+    if cached is not None:
+        return cached
     image = nib.load(str(path))
     values = np.asanyarray(image.dataobj, dtype=np.float32)
     zooms = tuple(float(value) for value in image.header.get_zooms()[:3])
-    chosen = quality if quality in QUALITY_VOXELS else "balanced"
     values, zooms, preview = _downsample(values, zooms, chosen)
-    return values.tobytes(order="F"), {
-        "dimensions": list(values.shape),
-        "spacing": list(zooms),
-        "preview": preview,
-        "quality": chosen,
-        "order": "source-axes",
-        "dtype": "float32",
-    }
+    payload = (
+        values.tobytes(order="F"),
+        {
+            "dimensions": list(values.shape),
+            "spacing": list(zooms),
+            "preview": preview,
+            "quality": chosen,
+            "order": "source-axes",
+            "dtype": "float32",
+        },
+    )
+    _volume_cache_put(cache_key, payload)
+    return payload
 
 
-def dicom_volume_bytes(instances, quality: str = "high") -> tuple[bytes, dict]:
+def dicom_volume_bytes(instances, quality: str = "preview") -> tuple[bytes, dict]:
     import pydicom
     if len(instances) < 8:
         raise ImageValidationError("A single image or short series is not reconstructed as a 3D volume")
+    chosen = quality if quality in QUALITY_VOXELS else "preview"
+    stamp = tuple((str(path), path.stat().st_mtime_ns) for path in instances)
+    cache_key = ("dicom", stamp, chosen)
+    cached = _volume_cache_get(cache_key)
+    if cached is not None:
+        return cached
     frames = []
     spacing = None
     for path in instances:
@@ -335,14 +373,18 @@ def dicom_volume_bytes(instances, quality: str = "high") -> tuple[bytes, dict]:
             spacing = (float(raw[0]), float(raw[1])) if raw is not None and len(raw) == 2 else (1.0, 1.0)
     stack = np.stack(frames, axis=2)
     slice_spacing = 1.0
-    chosen = quality if quality in QUALITY_VOXELS else "balanced"
     values, zooms, preview = _downsample(stack.astype(np.float32), (spacing[1], spacing[0], slice_spacing), chosen)
-    return values.tobytes(order="F"), {
-        "dimensions": list(values.shape),
-        "spacing": list(zooms),
-        "preview": preview,
-        "quality": chosen,
-        "order": "source-axes",
-        "dtype": "float32",
-        "spacing_note": "in-plane spacing from PixelSpacing; slice spacing is 1 mm unless positions were used only for ordering",
-    }
+    payload = (
+        values.tobytes(order="F"),
+        {
+            "dimensions": list(values.shape),
+            "spacing": list(zooms),
+            "preview": preview,
+            "quality": chosen,
+            "order": "source-axes",
+            "dtype": "float32",
+            "spacing_note": "in-plane spacing from PixelSpacing; slice spacing is 1 mm unless positions were used only for ordering",
+        },
+    )
+    _volume_cache_put(cache_key, payload)
+    return payload
