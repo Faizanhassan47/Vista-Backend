@@ -154,10 +154,44 @@ def _validate_wsi(path: Path, openslide_module) -> dict[str, Any]:
         raise ImageValidationError("File is corrupt, incomplete, or not readable by OpenSlide") from exc
 
 
+def inspect_nifti(path: Path) -> dict[str, Any]:
+    name = path.name.lower()
+    if not (name.endswith(".nii") or name.endswith(".nii.gz")):
+        raise ImageValidationError("NIfTI files must end in .nii or .nii.gz")
+    try:
+        import nibabel as nib
+    except ImportError as exc:
+        raise ImageValidationError("NIfTI inspection requires nibabel") from exc
+    try:
+        image = nib.load(str(path))
+    except Exception as exc:
+        raise ImageValidationError(f"{path.name} could not be read as NIfTI") from exc
+    shape = tuple(int(part) for part in image.shape)
+    if len(shape) != 3:
+        raise ImageValidationError(f"{path.name} has {len(shape)} dimensions. Only 3D NIfTI volumes are supported.")
+    zooms = tuple(float(part) for part in image.header.get_zooms()[:3])
+    return {
+        "file_type": "nifti",
+        "format": "NIfTI",
+        "width": shape[0],
+        "height": shape[1],
+        "level_count": shape[2],
+        "file_size": path.stat().st_size,
+        "checksum_sha256": calculate_sha256(path),
+        "normalized_metadata": {"slide_label": path.name, "barcode": None, "scanner_vendor": None, "scanner_model": None, "magnification": None, "acquisition_time": None},
+        "physical_calibration": {"available": all(value > 0 for value in zooms), "pixel_size_microns_x": zooms[0] * 1000, "pixel_size_microns_y": zooms[1] * 1000, "source": "NIfTI zooms" if all(value > 0 for value in zooms) else None},
+        "renderer_type": "nifti-volume",
+        "nifti": {"shape": shape, "zooms": zooms},
+    }
+
+
 def validate_image_file(path: Path, openslide_module=None) -> dict[str, Any]:
     path = Path(path)
     suffix = path.suffix.lower()
-    if path.is_dir() or suffix in DICOM_EXTENSIONS or (path.is_file() and _looks_like_dicom(path)):
+    if path.name.lower().endswith(".nii") or path.name.lower().endswith(".nii.gz"):
+        details = inspect_nifti(path)
+        suffix = ".nii.gz" if path.name.lower().endswith(".nii.gz") else ".nii"
+    elif path.is_dir() or suffix in DICOM_EXTENSIONS or (path.is_file() and _looks_like_dicom(path)):
         from services.dicom_reader import discover_series
 
         details = discover_series(path)

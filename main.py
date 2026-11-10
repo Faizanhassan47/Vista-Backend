@@ -101,7 +101,7 @@ app.add_middleware(
     allow_credentials=env_bool("CORS_ALLOW_CREDENTIALS", False),
     allow_methods=[method.strip() for method in os.getenv("CORS_ALLOW_METHODS", "GET,POST,PATCH,DELETE,OPTIONS").split(",") if method.strip()],
     allow_headers=["*"],
-    expose_headers=["Content-Disposition"],
+    expose_headers=["Content-Disposition", "X-Matching-Pixels", "X-Eligible-Pixels", "X-Percentage", "X-Width", "X-Height", "X-Unit", "X-Dim-I", "X-Dim-J", "X-Dim-K", "X-Spacing-I", "X-Spacing-J", "X-Spacing-K", "X-Preview", "X-Order", "X-Quality"],
 )
 
 

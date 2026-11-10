@@ -52,11 +52,22 @@ def test_wsi_series_is_accepted_and_ct_is_ignored(tmp_path: Path):
     assert series_info["normalized_metadata"]["barcode"] == "SP-100"
 
 
-def test_ct_only_file_is_rejected(tmp_path: Path):
+def test_ct_files_group_into_one_stack(tmp_path: Path):
+    study = generate_uid()
+    series = generate_uid()
+    _write(tmp_path / "002.dcm", "1.2.840.10008.5.1.4.1.1.2", series, study, generate_uid(), 64, 64)
+    _write(tmp_path / "001.dcm", "1.2.840.10008.5.1.4.1.1.2", series, study, generate_uid(), 64, 64)
+    info = discover_series(tmp_path)
+    assert info["file_type"] == "dicom-stack"
+    assert info["level_count"] == 2
+    assert info["modality"] == "CT"
+
+
+def test_ct_only_file_is_a_stack(tmp_path: Path):
     path = tmp_path / "ct.dcm"
     _write(path, "1.2.840.10008.5.1.4.1.1.2", generate_uid(), generate_uid(), generate_uid(), 64, 64)
-    with pytest.raises(ImageValidationError, match="Unsupported DICOM"):
-        validate_image_file(path)
+    info = validate_image_file(path)
+    assert info["file_type"] == "dicom-stack"
 
 
 def test_duplicate_sop_instance_is_rejected(tmp_path: Path):

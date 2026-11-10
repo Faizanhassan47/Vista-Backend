@@ -1,4 +1,4 @@
-﻿"""
+"""
 Cases and Slides API.
 Handles:
 - Pathology Cases (CRUD, status, assign reviewer, review notes, review history)
@@ -36,6 +36,18 @@ from core.security import (
     ROLE_PATHOLOGIST,
 )
 from services.image_validation import ImageValidationError, validate_image_file
+from services.radiology_frames import (
+    dicom_thumbnail_jpeg,
+    dicom_volume_bytes,
+    hu_mask_png,
+    nifti_calibration,
+    nifti_plane_counts,
+    nifti_threshold_png,
+    nifti_thumbnail_jpeg,
+    nifti_volume_bytes,
+    render_dicom_frame,
+    render_nifti_slice,
+)
 from services.object_storage import delete_case_file, upload_case_file
 from services.slide_cache import (
     DeepZoomGenerator,
@@ -659,6 +671,184 @@ def create_cases_router(
 
     # --- WSI DeepZoom & Image Rendering Endpoints ---
 
+    def _record_validation(case_pk, label, stain, specimen_description, filename, validation):
+        with closing(connect()) as db:
+            duplicate = db.execute("""
+                SELECT TOP 1 c.case_id AS case_code FROM image_versions iv
+                JOIN slides s ON s.id = iv.slide_id JOIN cases c ON c.id = s.case_id
+                WHERE iv.checksum_sha256 = ?
+            """, (validation["checksum_sha256"],)).fetchone()
+            if duplicate:
+                raise HTTPException(409, f"Duplicate image content already exists in Case '{duplicate.get('case_code') or 'another active case'}'")
+            cursor = db.execute("""INSERT INTO slides
+                (case_id, label, stain, specimen_description, filename, file_type,
+                 format, file_size, width, height, level_count, upload_state,
+                 qc_status, qc_actor, qc_timestamp)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ready', 'Passed', 'System Automated QC', SYSUTCDATETIME())""",
+                (case_pk, label, stain, specimen_description, filename, validation["file_type"], validation["format"],
+                 validation["file_size"], validation["width"], validation["height"], validation["level_count"]))
+            db.execute("""INSERT INTO image_versions (slide_id,version,checksum_sha256,metadata_json,stored_filename)
+                VALUES (?,1,?,?,?)""", (cursor.lastrowid, validation["checksum_sha256"], json.dumps(validation), filename))
+            db.commit()
+            return db.execute("SELECT * FROM slides WHERE id = ?", (cursor.lastrowid,)).fetchone()
+
+    @router.post("/api/cases/{case_pk}/imaging", dependencies=[Depends(require_roles(INTAKE_ROLES))])
+    async def add_imaging_series(case_pk: int, label: str = Form("Imaging"), files: list[UploadFile] = File(...), current_user: dict = Depends(get_current_user)):
+        get_case_fn(case_pk)
+        require_assigned_case_fn(get_case_fn(case_pk), current_user)
+        if not files:
+            raise HTTPException(400, "Choose at least one DICOM or NIfTI file")
+        folder_name = uuid4().hex
+        folder = stored_path_fn(folder_name)
+        folder.mkdir(parents=True, exist_ok=False)
+        try:
+            for upload in files:
+                name = Path(upload.filename or "image").name
+                if name.lower().endswith(".nii.gz"):
+                    suffix = ".nii.gz"
+                else:
+                    suffix = Path(name).suffix.lower()
+                if suffix not in {".dcm", ".dicom", ".nii", ".nii.gz"} and not name.lower().endswith(".nii.gz"):
+                    raise HTTPException(400, f"{name} is not a DICOM or NIfTI file")
+                target = folder / name
+                await _save_stream(upload, target, WSI_MAX_BYTES)
+            validation = validate_image_file(folder if any(path.suffix.lower() in {".dcm", ".dicom"} or _dicom_magic(path) for path in folder.iterdir()) else next(folder.iterdir()), openslide)
+            anchor = Path(validation.get("anchor") or next(folder.iterdir()))
+            filename = f"{folder_name}/{anchor.name}"
+            row = _record_validation(case_pk, label.strip() or "Imaging", "", "", filename, validation)
+        except Exception:
+            shutil.rmtree(folder, ignore_errors=True)
+            raise
+        return serialize_slide(row)
+
+    def _dicom_magic(path: Path) -> bool:
+        try:
+            return path.read_bytes()[128:132] == b"DICM"
+        except OSError:
+            return False
+
+    def _radiology_record(slide_id: int, current_user):
+        slide = get_slide_fn(slide_id)
+        require_assigned_case_fn(get_case_fn(slide["case_id"]), current_user)
+        if slide["file_type"] not in {"dicom-stack", "nifti"}:
+            raise HTTPException(404, "This item is not a radiology image")
+        with closing(connect()) as db:
+            version = db.execute("SELECT metadata_json FROM image_versions WHERE slide_id = ? ORDER BY version DESC", (slide_id,)).fetchone()
+        metadata = json.loads(version["metadata_json"]) if version and version.get("metadata_json") else {}
+        return slide, metadata
+
+    @router.get("/api/slides/{slide_id}/radiology", dependencies=[Depends(require_roles(CLINICAL_READ_ROLES))])
+    def radiology_metadata(slide_id: int, current_user: dict = Depends(get_current_user)):
+        slide, metadata = _radiology_record(slide_id, current_user)
+        path = stored_path_fn(slide["filename"])
+        plane_counts = None
+        if slide["file_type"] == "nifti":
+            source = path if path.is_file() else next(path.parent.glob("*.nii*"))
+            plane_counts = nifti_plane_counts(source)
+        return {
+            "id": slide["id"],
+            "file_type": slide["file_type"],
+            "format": slide["format"],
+            "modality": metadata.get("modality") or slide["format"],
+            "instance_count": slide["level_count"],
+            "plane_counts": plane_counts,
+            "width": slide["width"],
+            "height": slide["height"],
+            "spacing_available": bool((metadata.get("physical_calibration") or {}).get("available")),
+            "renderer_type": metadata.get("renderer_type") or slide["file_type"],
+            "calibration": nifti_calibration(metadata) if slide["file_type"] == "nifti" else (
+                {"modality": "CT", "intensity_unit": "HU", "calibration_status": "verified", "calibration_source": "dicom", "hu_threshold_supported": True}
+                if "CT" in str(metadata.get("modality") or slide["format"] or "").upper() else
+                {"modality": metadata.get("modality"), "intensity_unit": "native", "calibration_status": "not_applicable", "calibration_source": None, "hu_threshold_supported": False}
+            ),
+            "volume_supported": slide["file_type"] == "nifti" or int(slide["level_count"] or 0) >= 8,
+        }
+
+    @router.get("/api/slides/{slide_id}/radiology/frame", dependencies=[Depends(require_roles(CLINICAL_READ_ROLES))])
+    def radiology_frame(slide_id: int, index: int = Query(0, ge=0), plane: str = Query("axial"), center: float | None = None, width: float | None = None, current_user: dict = Depends(get_current_user)):
+        slide, metadata = _radiology_record(slide_id, current_user)
+        path = stored_path_fn(slide["filename"])
+        try:
+            if slide["file_type"] == "nifti":
+                payload, _count = render_nifti_slice(path if path.is_file() else next(path.parent.glob("*.nii*")), plane, index, center, width)
+            else:
+                ordered = [Path(item["path"]) for item in metadata.get("instances") or [] if item.get("path")]
+                instances = ordered or sorted(item for item in path.parent.iterdir() if item.is_file())
+                if index >= len(instances):
+                    raise HTTPException(400, "Slice index is outside this series")
+                payload = render_dicom_frame(instances[index], center, width)
+        except ImageValidationError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        return Response(payload, media_type="image/png")
+
+    @router.get("/api/slides/{slide_id}/radiology/hu-mask", dependencies=[Depends(require_roles(CLINICAL_READ_ROLES))])
+    def radiology_hu_mask(slide_id: int, index: int = Query(0, ge=0), min_hu: float = Query(...), max_hu: float = Query(...), color: str = Query("red"), scale: str = Query("hu"), plane: str = Query("axial"), current_user: dict = Depends(get_current_user)):
+        slide, metadata = _radiology_record(slide_id, current_user)
+        path = stored_path_fn(slide["filename"])
+        try:
+            if slide["file_type"] == "nifti":
+                source = path if path.is_file() else next(path.parent.glob("*.nii*"))
+                calibration = nifti_calibration(metadata)
+                if scale == "hu" and not calibration["hu_threshold_supported"]:
+                    raise ImageValidationError("HU thresholding requires verified CT calibration. This NIfTI intensity scale is not verified as Hounsfield units.")
+                payload, stats = nifti_threshold_png(source, plane, index, min_hu, max_hu, color)
+                unit = "HU" if scale == "hu" else "native"
+            else:
+                if scale == "hu" and "CT" not in str(metadata.get("modality") or slide["format"] or "").upper():
+                    raise ImageValidationError("HU thresholding requires a calibrated CT image")
+                ordered = [Path(item["path"]) for item in metadata.get("instances") or [] if item.get("path")]
+                instances = ordered or sorted(item for item in (path.parent.iterdir() if path.parent.is_dir() else []) if item.is_file())
+                if instances and index >= len(instances):
+                    raise HTTPException(400, "Slice index is outside this series")
+                instance = instances[index] if instances else path
+                if not Path(instance).is_file():
+                    raise HTTPException(400, "The CT source file for this slice is missing")
+                payload, stats = hu_mask_png(instance, min_hu, max_hu, color)
+                unit = "HU"
+        except HTTPException:
+            raise
+        except ImageValidationError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        except FileNotFoundError as exc:
+            raise HTTPException(400, "The CT source file for this slice is missing") from exc
+        return Response(payload, media_type="image/png", headers={
+            "X-Matching-Pixels": str(stats["matching_pixels"]),
+            "X-Eligible-Pixels": str(stats["eligible_pixels"]),
+            "X-Percentage": str(stats["percentage"]),
+            "X-Width": str(stats["width"]),
+            "X-Height": str(stats["height"]),
+            "X-Unit": unit,
+            "Cache-Control": "private, max-age=300",
+        })
+
+    @router.get("/api/slides/{slide_id}/radiology/volume", dependencies=[Depends(require_roles(CLINICAL_READ_ROLES))])
+    def radiology_volume(slide_id: int, quality: str = Query("balanced"), current_user: dict = Depends(get_current_user)):
+        slide, metadata = _radiology_record(slide_id, current_user)
+        path = stored_path_fn(slide["filename"])
+        try:
+            if slide["file_type"] == "nifti":
+                payload, info = nifti_volume_bytes(path if path.is_file() else next(path.parent.glob("*.nii*")), quality)
+            else:
+                ordered = [Path(item["path"]) for item in metadata.get("instances") or [] if item.get("path")]
+                instances = ordered or sorted(item for item in path.parent.iterdir() if item.is_file())
+                payload, info = dicom_volume_bytes(instances, quality)
+        except ImageValidationError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        dimensions = info["dimensions"]
+        spacing = info["spacing"]
+        return Response(payload, media_type="application/octet-stream", headers={
+            "X-Dim-I": str(dimensions[0]),
+            "X-Dim-J": str(dimensions[1]),
+            "X-Dim-K": str(dimensions[2]),
+            "X-Spacing-I": str(spacing[0]),
+            "X-Spacing-J": str(spacing[1]),
+            "X-Spacing-K": str(spacing[2]),
+            "X-Preview": "1" if info["preview"] else "0",
+            "X-Quality": str(info.get("quality") or quality),
+            "X-Order": info["order"],
+            "Cache-Control": "private, max-age=60",
+        })
+
     @router.get("/api/slides/{slide_id}/image", dependencies=[Depends(require_roles(CLINICAL_READ_ROLES))])
     def slide_image(slide_id: int, current_user: dict = Depends(get_current_user)):
         slide = get_slide_fn(slide_id)
@@ -671,6 +861,17 @@ def create_cases_router(
         require_assigned_case_fn(get_case_fn(row["case_id"]), current_user)
         if row["file_type"] == "raster":
             return raster_response(row)
+        if row["file_type"] in {"dicom-stack", "nifti"}:
+            path = stored_path_fn(row["filename"])
+            try:
+                if row["file_type"] == "nifti":
+                    payload = nifti_thumbnail_jpeg(path if path.is_file() else next(path.parent.glob("*.nii*")))
+                else:
+                    instance = path if path.is_file() else next(item for item in path.parent.iterdir() if item.is_file())
+                    payload = dicom_thumbnail_jpeg(instance)
+            except (ImageValidationError, OSError, StopIteration) as exc:
+                raise HTTPException(400, str(exc) or "Thumbnail could not be created") from exc
+            return Response(payload, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=3600"})
         _, path = require_wsi_slide(slide_id)
         with slide_cache.acquire(path) as slide:
             thumbnail = slide.get_thumbnail((512, 512)).convert("RGB")

@@ -15,6 +15,12 @@ from uuid import uuid4
 from services.image_validation import ImageValidationError
 
 WSI_SOP_CLASS_UID = "1.2.840.10008.5.1.4.1.1.77.1.6"
+RADIOLOGY_SOP_CLASS_UIDS = {
+    "1.2.840.10008.5.1.4.1.1.2": "CT",
+    "1.2.840.10008.5.1.4.1.1.4": "MR",
+    "1.2.840.10008.5.1.4.1.1.7": "SC",
+    "1.2.840.10008.5.1.4.1.1.1": "CR",
+}
 
 
 def is_dicom_file(path: Path) -> bool:
@@ -109,6 +115,107 @@ def read_instance(path: Path) -> dict[str, Any]:
     }
 
 
+def _position(dataset):
+    value = getattr(dataset, "ImagePositionPatient", None)
+    if value is None:
+        return None
+    try:
+        return tuple(float(part) for part in value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _radiology_series(anchor: Path) -> dict[str, Any]:
+    """Group CT/MR and other single-frame radiology instances that share one series."""
+    anchor = Path(anchor)
+    files = sorted(path for path in (anchor.iterdir() if anchor.is_dir() else anchor.parent.iterdir()) if path.is_file() and is_dicom_file(path))
+    if anchor.is_file() and anchor not in files:
+        files.append(anchor)
+    if not files:
+        raise ImageValidationError("Directory contains no DICOM files")
+    seed = _dataset(anchor if anchor.is_file() else files[0])
+    sop_class = _text(seed, "SOPClassUID")
+    if sop_class not in RADIOLOGY_SOP_CLASS_UIDS:
+        modality = _text(seed, "Modality") or "unknown"
+        raise ImageValidationError(
+            f"Unsupported DICOM SOP Class {sop_class or 'missing'} (modality {modality}). "
+            "Accepted inputs are pathology WSI, CT, MR, CR, and secondary capture."
+        )
+    series_uid = _text(seed, "SeriesInstanceUID")
+    study_uid = _text(seed, "StudyInstanceUID")
+    if not series_uid or not study_uid:
+        raise ImageValidationError("DICOM series is missing Study or Series UID")
+    instances = []
+    seen = set()
+    for path in files:
+        dataset = _dataset(path)
+        if _text(dataset, "SeriesInstanceUID") != series_uid:
+            continue
+        if _text(dataset, "SOPClassUID") != sop_class:
+            continue
+        sop_instance = _text(dataset, "SOPInstanceUID")
+        if not sop_instance:
+            raise ImageValidationError(f"{path.name} is missing a SOP Instance UID")
+        if sop_instance in seen:
+            raise ImageValidationError(f"Duplicate SOP Instance UID {sop_instance}")
+        seen.add(sop_instance)
+        rows = int(getattr(dataset, "Rows", 0) or 0)
+        columns = int(getattr(dataset, "Columns", 0) or 0)
+        if rows < 1 or columns < 1:
+            raise ImageValidationError(f"{path.name} has no image dimensions")
+        instances.append({
+            "path": str(path),
+            "sop_instance_uid": sop_instance,
+            "instance_number": int(getattr(dataset, "InstanceNumber", 0) or 0),
+            "position": _position(dataset),
+            "rows": rows,
+            "columns": columns,
+            "file_size": path.stat().st_size,
+            "transfer_syntax_uid": _text(dataset.file_meta, "TransferSyntaxUID") if getattr(dataset, "file_meta", None) else None,
+        })
+    if not instances:
+        raise ImageValidationError("DICOM series contains no readable instances")
+    if all(item["position"] for item in instances):
+        normal = (0.0, 0.0, 1.0)
+        orientation = getattr(seed, "ImageOrientationPatient", None)
+        if orientation and len(orientation) == 6:
+            row = tuple(float(part) for part in orientation[:3])
+            column = tuple(float(part) for part in orientation[3:])
+            normal = (
+                row[1] * column[2] - row[2] * column[1],
+                row[2] * column[0] - row[0] * column[2],
+                row[0] * column[1] - row[1] * column[0],
+            )
+        instances.sort(key=lambda item: sum(a * b for a, b in zip(item["position"], normal)))
+    else:
+        instances.sort(key=lambda item: item["instance_number"])
+    modality = _text(seed, "Modality") or RADIOLOGY_SOP_CLASS_UIDS[sop_class]
+    spacing = _float(seed, "PixelSpacing")
+    digest = sha256()
+    total_size = 0
+    for instance in instances:
+        digest.update(instance["sop_instance_uid"].encode("utf-8"))
+        total_size += instance["file_size"]
+    return {
+        "file_type": "dicom-stack",
+        "format": f"{modality} DICOM",
+        "width": instances[0]["columns"],
+        "height": instances[0]["rows"],
+        "level_count": len(instances),
+        "study_instance_uid": study_uid,
+        "series_instance_uid": series_uid,
+        "sop_class_uid": sop_class,
+        "anchor": instances[0]["path"],
+        "instances": instances,
+        "file_size": total_size,
+        "checksum_sha256": digest.hexdigest(),
+        "normalized_metadata": {"slide_label": _text(seed, "SeriesDescription") or modality, "barcode": None, "scanner_vendor": _text(seed, "Manufacturer"), "scanner_model": _text(seed, "ManufacturerModelName"), "magnification": None, "acquisition_time": _text(seed, "StudyDate")},
+        "physical_calibration": {"available": bool(spacing), "pixel_size_microns_x": (spacing or 0) * 1000 or None, "pixel_size_microns_y": (spacing or 0) * 1000 or None, "source": "PixelSpacing" if spacing else None},
+        "renderer_type": "dicom-stack",
+        "modality": modality,
+    }
+
+
 def discover_series(anchor: Path) -> dict[str, Any]:
     """Read the WSI series that contains anchor. Sibling files of another series are ignored."""
     anchor = Path(anchor)
@@ -119,6 +226,8 @@ def discover_series(anchor: Path) -> dict[str, Any]:
         anchor = candidates[0]
     if not anchor.is_file():
         raise ImageValidationError("DICOM source does not exist")
+    if _text(_dataset(anchor), "SOPClassUID") != WSI_SOP_CLASS_UID:
+        return _radiology_series(anchor)
 
     seed = read_instance(anchor)
     folder = anchor.parent
