@@ -69,6 +69,7 @@ from services.kongnet_engine import (
     MODEL_VERSION as KONGNET_MODEL_VERSION,
     FEATURE_CODE as KONGNET_FEATURE_CODE,
 )
+from services.ai_evidence_service import safe_project_ai_analysis
 
 logger = logging.getLogger("pathology.ai_api")
 
@@ -304,6 +305,7 @@ def create_ai_router(connect_func, require_roles_func, get_current_user_func, ge
             overlay_filename=overlay_filename,
             report_filename=report_filename,
         )
+        safe_project_ai_analysis(connect_func, analysis_id)
 
         for cells in gallery_data.get("groups", {}).values():
             for cell in cells:
@@ -555,6 +557,7 @@ def create_ai_router(connect_func, require_roles_func, get_current_user_func, ge
             overlay_filename=overlay_filename,
             report_filename=report_filename,
         )
+        safe_project_ai_analysis(connect_func, analysis_id)
 
         for item in gallery_data.get("items", []):
             item["image_url"] = f"/api/ai/analyses/{analysis_id}/gallery/{item['filename']}"
@@ -686,6 +689,7 @@ def create_ai_router(connect_func, require_roles_func, get_current_user_func, ge
                 case_row=case_row, requested_by=username,
                 result=result, roi_image_dir=AI_ROI_DIR,
             )
+            safe_project_ai_analysis(connect_func, analysis_id)
             job.analysis_id = analysis_id
             job.result = _camelyon_job_result(analysis_id, slide_row, case_row, result)
             if not job.cancel_event.is_set():

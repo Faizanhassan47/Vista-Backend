@@ -16,6 +16,7 @@ from fpdf import FPDF
 from pydantic import BaseModel, Field
 
 from core.security import ADMIN_ROLES, CLINICAL_READ_ROLES, ROLE_PATHOLOGIST
+from services.ai_evidence_service import list_verified_findings_for_case
 
 
 def _pdf_text(value):
@@ -103,54 +104,49 @@ def create_reports_router(connect, require_roles, get_current_user, get_case_fn,
 
     @router.get("/api/cases/{case_pk}/ai-report-draft", dependencies=[Depends(require_roles(pathologist_and_admin))])
     def ai_report_draft(case_pk: int, current_user: dict = Depends(get_current_user)):
-        """Create a review-only microscopic-findings draft from completed AI outputs."""
+        """Draft microscopic text from explicitly Accepted/Corrected Evidence Map findings only."""
         case = get_case_fn(case_pk)
         require_assigned_case_fn(case, current_user)
-        with closing(connect()) as db:
-            rows = db.execute(
-                """SELECT r.result_type, r.measurements_json, r.raw_output_json, r.confidence, r.review_status,
-                          j.completed_at, s.label AS slide_label, s.stain,
-                          m.name AS model_name, m.version AS model_version, m.limitations
-                   FROM slides s
-                   JOIN ai_jobs j ON j.slide_id = s.id
-                   JOIN ai_results r ON r.ai_job_id = j.id
-                   JOIN ai_models m ON m.id = j.model_id
-                   WHERE s.case_id = ? AND j.status = 'Completed'
-                   ORDER BY s.id, j.completed_at, r.id""",
-                (case_pk,),
-            ).fetchall()
-        if not rows:
-            raise HTTPException(404, "No completed AI analysis is available for this case")
+        findings = list_verified_findings_for_case(connect, case_pk)
+        if not findings:
+            raise HTTPException(
+                404,
+                "No verified Evidence Map findings are available for this case. Accept or Correct findings before inserting an AI-assisted draft.",
+            )
 
         lines = [
             "AI-ASSISTED MICROSCOPIC FINDINGS DRAFT",
-            "Research-use output only. This draft must be reviewed, edited, and clinically correlated by the reporting pathologist; it is not a final diagnosis.",
+            "Research-use output only. Limited to pathologist-verified Evidence Map findings. Model scores are uncalibrated and this draft is not a diagnosis.",
             "",
         ]
-        for row in rows:
-            confidence = f"; confidence {float(row['confidence']) * 100:.1f}%" if row['confidence'] is not None else ""
-            review = f"; review status {row['review_status']}" if row['review_status'] else ""
-            slide = row['slide_label'] or "Unlabelled slide"
-            stain = f" ({row['stain']})" if row['stain'] else ""
-            lines.append(f"- {slide}{stain}: {row['model_name']} {row['model_version'] or ''} reported {row['result_type']}{confidence}{review}.")
-            try:
-                measurements = json.loads(row['measurements_json'] or "{}")
-            except (TypeError, json.JSONDecodeError):
-                measurements = {}
-            if isinstance(measurements, dict):
-                values = []
-                for key, value in measurements.items():
-                    if isinstance(value, (str, int, float, bool)) and value not in (None, ""):
-                        values.append(f"{str(key).replace('_', ' ')}: {value}")
-                    if len(values) == 5:
-                        break
-                if values:
-                    lines.append(f"  Measurements: {'; '.join(values)}.")
-            if row['limitations']:
-                lines.append(f"  Model limitation: {row['limitations']}")
+        for item in findings:
+            slide = item.get("slide_label") or "Unlabelled slide"
+            stain = f" ({item['stain']})" if item.get("stain") else ""
+            score = item.get("score")
+            score_text = (
+                f"; uncalibrated score {float(score):.3f}"
+                if score is not None
+                else ""
+            )
+            lines.append(
+                f"- {slide}{stain}: verified {item.get('finding_type')} "
+                f"({item.get('label') or 'unlabelled'}) via {item.get('model_name')} "
+                f"{item.get('model_version') or ''} [{item.get('review_status')}]"
+                f"{score_text}; source {item.get('source_kind')}#{item.get('source_analysis_id')} "
+                f"/ evidence #{item.get('id')}."
+            )
+            lines.append(
+                "  Calibration: uncalibrated model output — not a clinical probability."
+            )
 
         draft = "\n".join(lines)
-        return {"microscopic_findings": draft[:4000], "result_count": len(rows), "disclaimer": lines[1]}
+        return {
+            "microscopic_findings": draft[:4000],
+            "result_count": len(findings),
+            "disclaimer": lines[1],
+            "source": "ai_evidence_findings",
+            "review_required": True,
+        }
 
     @router.post("/api/cases/{case_pk}/reports", status_code=201, dependencies=[Depends(require_roles(pathologist_and_admin))])
     def create_draft_report(case_pk: int, current_user: dict = Depends(get_current_user)):

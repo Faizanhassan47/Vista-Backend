@@ -25,6 +25,7 @@ from services.grandqc_repository import (
     list_grandqc_analyses,
     save_grandqc_analysis,
 )
+from services.ai_evidence_service import safe_project_qc_analysis
 
 logger = logging.getLogger("pathology.grandqc_api")
 
@@ -220,6 +221,7 @@ def create_grandqc_router(
                     job_id=job_id,
                     result=result,
                 )
+                safe_project_qc_analysis(connect_func, analysis_id)
 
                 with _JOBS_LOCK:
                     job.update({
