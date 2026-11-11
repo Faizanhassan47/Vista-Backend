@@ -40,6 +40,7 @@ from services.radiology_frames import (
     dicom_thumbnail_jpeg,
     dicom_volume_bytes,
     hu_mask_png,
+    dicom_intensity_mask_png,
     nifti_calibration,
     nifti_plane_counts,
     nifti_threshold_png,
@@ -801,7 +802,9 @@ def create_cases_router(
                 payload, stats = nifti_threshold_png(source, plane, index, min_hu, max_hu, color)
                 unit = "HU" if scale == "hu" else "native"
             else:
-                if scale == "hu" and "CT" not in str(metadata.get("modality") or slide["format"] or "").upper():
+                modality = str(metadata.get("modality") or slide["format"] or "").upper()
+                is_ct = "CT" in modality
+                if scale == "hu" and not is_ct:
                     raise ImageValidationError("HU thresholding requires a calibrated CT image")
                 ordered = [Path(item["path"]) for item in metadata.get("instances") or [] if item.get("path")]
                 instances = ordered or sorted(item for item in (path.parent.iterdir() if path.parent.is_dir() else []) if item.is_file())
@@ -809,16 +812,25 @@ def create_cases_router(
                     raise HTTPException(400, "Slice index is outside this series")
                 instance = instances[index] if instances else path
                 if not Path(instance).is_file():
-                    raise HTTPException(400, "The CT source file for this slice is missing")
-                payload, stats = hu_mask_png(instance, min_hu, max_hu, color)
-                unit = "HU"
+                    raise HTTPException(400, "The imaging source file for this slice is missing")
+                # Prefer strict HU for CT when requested; otherwise modality intensities.
+                if is_ct and scale == "hu":
+                    try:
+                        payload, stats = hu_mask_png(instance, min_hu, max_hu, color)
+                        unit = "HU"
+                    except ImageValidationError:
+                        payload, stats = dicom_intensity_mask_png(instance, min_hu, max_hu, color)
+                        unit = "intensity"
+                else:
+                    payload, stats = dicom_intensity_mask_png(instance, min_hu, max_hu, color)
+                    unit = "HU" if is_ct else "intensity"
         except HTTPException:
             raise
         except ImageValidationError as exc:
             raise HTTPException(400, str(exc)) from exc
         except FileNotFoundError as exc:
             raise HTTPException(400, "The CT source file for this slice is missing") from exc
-        return Response(payload, media_type="image/png", headers={
+        headers = {
             "X-Matching-Pixels": str(stats["matching_pixels"]),
             "X-Eligible-Pixels": str(stats["eligible_pixels"]),
             "X-Percentage": str(stats["percentage"]),
@@ -826,7 +838,12 @@ def create_cases_router(
             "X-Height": str(stats["height"]),
             "X-Unit": unit,
             "Cache-Control": "private, max-age=300",
-        })
+        }
+        if stats.get("value_min") is not None:
+            headers["X-Value-Min"] = str(stats["value_min"])
+        if stats.get("value_max") is not None:
+            headers["X-Value-Max"] = str(stats["value_max"])
+        return Response(payload, media_type="image/png", headers=headers)
 
     @router.get("/api/slides/{slide_id}/radiology/volume", dependencies=[Depends(require_roles(CLINICAL_READ_ROLES))])
     def radiology_volume(slide_id: int, quality: str = Query("preview"), current_user: dict = Depends(get_current_user)):

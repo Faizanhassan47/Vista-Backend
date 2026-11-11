@@ -6,7 +6,7 @@ from io import BytesIO
 import numpy as np
 import nibabel as nib
 
-from services.radiology_frames import dicom_thumbnail_jpeg, hu_mask_png, nifti_calibration, nifti_plane_counts, nifti_volume_bytes, render_dicom_frame, render_nifti_slice
+from services.radiology_frames import dicom_intensity_mask_png, dicom_thumbnail_jpeg, hu_mask_png, nifti_calibration, nifti_plane_counts, nifti_volume_bytes, render_dicom_frame, render_nifti_slice
 
 SAMPLE = Path(__file__).resolve().parents[1] / ".venv" / "Lib" / "site-packages" / "pydicom" / "data" / "test_files" / "693_J2KI.dcm"
 
@@ -32,6 +32,15 @@ def test_hu_mask_uses_calibrated_range():
     assert 0 < air_stats["eligible_pixels"] <= 512 * 512
     assert air_stats["matching_pixels"] != dense_stats["matching_pixels"]
     assert air != dense
+    assert air_stats["value_min"] is not None
+    assert air_stats["value_max"] is not None
+
+
+def test_dicom_intensity_mask_matches_hu_for_ct():
+    air_hu, air_hu_stats = hu_mask_png(SAMPLE, -1000, -500)
+    air_i, air_i_stats = dicom_intensity_mask_png(SAMPLE, -1000, -500)
+    assert air_i == air_hu
+    assert air_i_stats["matching_pixels"] == air_hu_stats["matching_pixels"]
 
 
 def test_nifti_hu_is_not_inferred_from_intensities():

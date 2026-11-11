@@ -81,27 +81,31 @@ COLORS = {
 }
 
 
-def calibrated_ct_pixels(dataset):
-    """Return Hounsfield values for a CT dataset, or raise if they are not HU."""
+def _dicom_frame_pixels(dataset, frame_index: int = 0):
+    """Return a 2D pixel array for one frame from a single- or multi-frame DICOM."""
+    pixels = dataset.pixel_array
+    if pixels.ndim == 2:
+        return pixels
+    if pixels.ndim == 3:
+        # Multi-frame: (frames, rows, cols) or RGB (rows, cols, 3)
+        if pixels.shape[-1] in {3, 4} and pixels.shape[0] > 4:
+            raise ImageValidationError("Color DICOM frames cannot be thresholded as intensity volumes")
+        if pixels.shape[0] <= 4 and pixels.shape[-1] in {3, 4}:
+            raise ImageValidationError("Color DICOM frames cannot be thresholded as intensity volumes")
+        index = max(0, min(int(frame_index), pixels.shape[0] - 1))
+        return pixels[index]
+    raise ImageValidationError("Unsupported DICOM pixel array shape")
+
+
+def _apply_modality_values(dataset, pixels):
     from pydicom.pixels import apply_modality_lut
 
-    modality = str(getattr(dataset, "Modality", "") or "").upper()
-    if modality != "CT":
-        raise ImageValidationError("HU thresholding is only available for CT images")
-    rescale_type = str(getattr(dataset, "RescaleType", "") or "").strip().upper()
-    if rescale_type and rescale_type not in {"HU", "HOUNSFIELD"}:
-        raise ImageValidationError(f"RescaleType {rescale_type} is not Hounsfield units")
-    has_lut = bool(getattr(dataset, "ModalityLUTSequence", None))
-    has_rescale = hasattr(dataset, "RescaleSlope") or hasattr(dataset, "RescaleIntercept")
-    if not has_lut and not has_rescale:
-        raise ImageValidationError("This CT image has no Hounsfield calibration")
-    pixels = dataset.pixel_array
-    if pixels.ndim == 3:
-        pixels = pixels[0]
     try:
         values = apply_modality_lut(pixels, dataset).astype(np.float32)
-    except Exception as exc:
-        raise ImageValidationError(f"Modality transformation failed: {exc}") from exc
+    except Exception:
+        slope = float(getattr(dataset, "RescaleSlope", 1) or 1)
+        intercept = float(getattr(dataset, "RescaleIntercept", 0) or 0)
+        values = pixels.astype(np.float32) * slope + intercept
     padding = getattr(dataset, "PixelPaddingValue", None)
     if padding is not None:
         try:
@@ -111,21 +115,47 @@ def calibrated_ct_pixels(dataset):
     return values
 
 
-def hu_mask_png(path, min_hu: float, max_hu: float, color: str = "red") -> tuple[bytes, dict]:
-    import pydicom
-
-    if min_hu > max_hu:
-        raise ImageValidationError("Maximum HU must be greater than or equal to minimum HU")
-    dataset = pydicom.dcmread(str(path))
-    syntax = str(getattr(getattr(dataset, "file_meta", None), "TransferSyntaxUID", "") or "")
+def calibrated_ct_pixels(dataset, frame_index: int = 0):
+    """Return Hounsfield values for a CT dataset, or raise if they are not HU."""
+    modality = str(getattr(dataset, "Modality", "") or "").upper()
+    if modality != "CT":
+        raise ImageValidationError("HU thresholding is only available for CT images")
+    rescale_type = str(getattr(dataset, "RescaleType", "") or "").strip().upper()
+    has_lut = bool(getattr(dataset, "ModalityLUTSequence", None))
+    has_rescale = hasattr(dataset, "RescaleSlope") or hasattr(dataset, "RescaleIntercept")
+    # Many clinical CTs omit RescaleType or set a vendor string; slope/intercept still yield HU.
+    if rescale_type and rescale_type not in {"HU", "HOUNSFIELD"} and not (has_lut or has_rescale):
+        raise ImageValidationError(f"RescaleType {rescale_type} is not Hounsfield units")
+    if not has_lut and not has_rescale:
+        raise ImageValidationError("This CT image has no Hounsfield calibration")
     try:
-        values = calibrated_ct_pixels(dataset)
+        pixels = _dicom_frame_pixels(dataset, frame_index)
+    except Exception as exc:
+        syntax = str(getattr(getattr(dataset, "file_meta", None), "TransferSyntaxUID", "") or "")
+        raise ImageValidationError(f"Transfer syntax {syntax or 'unknown'} could not be decoded: {exc}") from exc
+    try:
+        return _apply_modality_values(dataset, pixels)
+    except Exception as exc:
+        raise ImageValidationError(f"Modality transformation failed: {exc}") from exc
+
+
+def dicom_intensity_pixels(dataset, frame_index: int = 0):
+    """Return modality-rescaled intensities for any single-frame radiology DICOM."""
+    try:
+        pixels = _dicom_frame_pixels(dataset, frame_index)
     except ImageValidationError:
         raise
     except Exception as exc:
+        syntax = str(getattr(getattr(dataset, "file_meta", None), "TransferSyntaxUID", "") or "")
         raise ImageValidationError(f"Transfer syntax {syntax or 'unknown'} could not be decoded: {exc}") from exc
+    return _apply_modality_values(dataset, pixels)
+
+
+def _mask_png_from_values(values: np.ndarray, low: float, high: float, color: str) -> tuple[bytes, dict]:
+    if low > high:
+        raise ImageValidationError("Maximum must be greater than or equal to minimum")
     eligible = np.isfinite(values)
-    mask = eligible & (values >= min_hu) & (values <= max_hu)
+    mask = eligible & (values >= low) & (values <= high)
     rgb = COLORS.get(color, COLORS["red"])
     image = np.zeros((*mask.shape, 4), dtype=np.uint8)
     image[mask] = (*rgb, 255)
@@ -134,14 +164,40 @@ def hu_mask_png(path, min_hu: float, max_hu: float, color: str = "red") -> tuple
     eligible_count = int(eligible.sum())
     matching = int(mask.sum())
     return buffer.getvalue(), {
-        "min_hu": min_hu,
-        "max_hu": max_hu,
+        "min_hu": low,
+        "max_hu": high,
         "matching_pixels": matching,
         "eligible_pixels": eligible_count,
         "width": int(mask.shape[1]),
         "height": int(mask.shape[0]),
         "percentage": round(100 * matching / eligible_count, 2) if eligible_count else 0,
+        "value_min": float(np.nanmin(values)) if eligible_count else None,
+        "value_max": float(np.nanmax(values)) if eligible_count else None,
     }
+
+
+def hu_mask_png(path, min_hu: float, max_hu: float, color: str = "red", frame_index: int = 0) -> tuple[bytes, dict]:
+    import pydicom
+
+    dataset = pydicom.dcmread(str(path))
+    values = calibrated_ct_pixels(dataset, frame_index=frame_index)
+    return _mask_png_from_values(values, min_hu, max_hu, color)
+
+
+def dicom_intensity_mask_png(path, low: float, high: float, color: str = "red", frame_index: int = 0) -> tuple[bytes, dict]:
+    """Threshold a DICOM frame using modality-rescaled intensities (CT HU or native MR/etc.)."""
+    import pydicom
+
+    dataset = pydicom.dcmread(str(path))
+    modality = str(getattr(dataset, "Modality", "") or "").upper()
+    if modality == "CT":
+        try:
+            values = calibrated_ct_pixels(dataset, frame_index=frame_index)
+        except ImageValidationError:
+            values = dicom_intensity_pixels(dataset, frame_index=frame_index)
+    else:
+        values = dicom_intensity_pixels(dataset, frame_index=frame_index)
+    return _mask_png_from_values(values, low, high, color)
 
 
 def dicom_thumbnail_jpeg(path) -> bytes:
@@ -279,26 +335,10 @@ def _nifti_display_values(path, plane: str, index: int):
 
 
 def nifti_threshold_png(path, plane: str, index: int, low: float, high: float, color: str = "red") -> tuple[bytes, dict]:
-    if low > high:
-        raise ImageValidationError("Maximum value must be greater than or equal to the minimum")
     values, _count = _nifti_display_values(path, plane, index)
-    eligible = np.isfinite(values)
-    mask = eligible & (values >= low) & (values <= high)
-    rgb = COLORS.get(color, COLORS["red"])
-    image = np.zeros((*mask.shape, 4), dtype=np.uint8)
-    image[mask] = (*rgb, 255)
-    buffer = BytesIO()
-    Image.fromarray(image, mode="RGBA").save(buffer, format="PNG")
-    eligible_count = int(eligible.sum())
-    matching = int(mask.sum())
-    return buffer.getvalue(), {
-        "matching_pixels": matching,
-        "eligible_pixels": eligible_count,
-        "percentage": round(100 * matching / eligible_count, 2) if eligible_count else 0,
-        "width": int(mask.shape[1]),
-        "height": int(mask.shape[0]),
-        "denominator": "image pixels on this slice",
-    }
+    payload, stats = _mask_png_from_values(values, low, high, color)
+    stats["denominator"] = "image pixels on this slice"
+    return payload, stats
 
 
 def _resample_axis(volume: np.ndarray, axis: int, new_size: int) -> np.ndarray:
@@ -367,7 +407,14 @@ def dicom_volume_bytes(instances, quality: str = "preview") -> tuple[bytes, dict
     spacing = None
     for path in instances:
         dataset = pydicom.dcmread(str(path))
-        frames.append(calibrated_ct_pixels(dataset) if str(getattr(dataset, "Modality", "")).upper() == "CT" else dataset.pixel_array.astype(np.float32))
+        modality = str(getattr(dataset, "Modality", "") or "").upper()
+        if modality == "CT":
+            try:
+                frames.append(calibrated_ct_pixels(dataset))
+            except ImageValidationError:
+                frames.append(dicom_intensity_pixels(dataset))
+        else:
+            frames.append(dicom_intensity_pixels(dataset))
         if spacing is None:
             raw = getattr(dataset, "PixelSpacing", None)
             spacing = (float(raw[0]), float(raw[1])) if raw is not None and len(raw) == 2 else (1.0, 1.0)
