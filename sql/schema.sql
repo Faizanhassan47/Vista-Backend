@@ -547,6 +547,96 @@ CREATE TABLE dbo.ai_analyses (
 GO
 
 -- ------------------------------------------------------------------------------
+-- 7b. AI EVIDENCE MAP (Phase 1) — normalized, reviewable findings
+-- ------------------------------------------------------------------------------
+
+IF OBJECT_ID('dbo.ai_evidence_findings', 'U') IS NULL
+CREATE TABLE dbo.ai_evidence_findings (
+    id                      INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_ai_evidence_findings PRIMARY KEY,
+    slide_id                INT NOT NULL CONSTRAINT FK_ai_evidence_findings_slide REFERENCES dbo.slides(id) ON DELETE CASCADE,
+    case_id                 INT NOT NULL CONSTRAINT FK_ai_evidence_findings_case REFERENCES dbo.cases(id),
+    source_kind             VARCHAR(30) NOT NULL,
+    source_analysis_id      INT NOT NULL,
+    source_finding_key      VARCHAR(160) NOT NULL,
+    feature_code            VARCHAR(80) NOT NULL,
+    model_name              VARCHAR(255) NOT NULL,
+    model_version           VARCHAR(120) NOT NULL,
+    finding_type            VARCHAR(40) NOT NULL,
+    label                   VARCHAR(160) NULL,
+    geometry_json           NVARCHAR(MAX) NOT NULL,
+    coordinate_system       VARCHAR(40) NOT NULL CONSTRAINT DF_ai_evidence_coord DEFAULT ('level_0_pixels'),
+    score                   FLOAT NULL,
+    score_calibration_status VARCHAR(40) NOT NULL CONSTRAINT DF_ai_evidence_calib DEFAULT ('uncalibrated'),
+    qc_context_json         NVARCHAR(MAX) NULL,
+    provenance_json         NVARCHAR(MAX) NULL,
+    review_status           VARCHAR(30) NOT NULL CONSTRAINT DF_ai_evidence_review DEFAULT ('Unreviewed'),
+    latest_review_event_id  INT NULL,
+    created_at              DATETIME2 NOT NULL CONSTRAINT DF_ai_evidence_created DEFAULT (SYSUTCDATETIME()),
+    CONSTRAINT UQ_ai_evidence_source UNIQUE (source_kind, source_analysis_id, source_finding_key),
+    CONSTRAINT CK_ai_evidence_source_kind CHECK (source_kind IN ('ai_analyses', 'qc_analyses')),
+    CONSTRAINT CK_ai_evidence_review_status CHECK (review_status IN ('Unreviewed', 'Accepted', 'Rejected', 'Corrected')),
+    CONSTRAINT CK_ai_evidence_geometry_json CHECK (ISJSON(geometry_json) = 1),
+    CONSTRAINT CK_ai_evidence_qc_context_json CHECK (qc_context_json IS NULL OR ISJSON(qc_context_json) = 1),
+    CONSTRAINT CK_ai_evidence_provenance_json CHECK (provenance_json IS NULL OR ISJSON(provenance_json) = 1)
+);
+GO
+
+IF OBJECT_ID('dbo.ai_evidence_review_events', 'U') IS NULL
+CREATE TABLE dbo.ai_evidence_review_events (
+    id                  INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_ai_evidence_review_events PRIMARY KEY,
+    finding_id          INT NOT NULL CONSTRAINT FK_ai_evidence_review_finding REFERENCES dbo.ai_evidence_findings(id) ON DELETE CASCADE,
+    action              VARCHAR(30) NOT NULL,
+    actor               VARCHAR(255) NOT NULL,
+    reason              NVARCHAR(MAX) NULL,
+    correction_json     NVARCHAR(MAX) NULL,
+    created_at          DATETIME2 NOT NULL CONSTRAINT DF_ai_evidence_review_created DEFAULT (SYSUTCDATETIME()),
+    CONSTRAINT CK_ai_evidence_review_action CHECK (action IN ('Accept', 'Reject', 'Correct')),
+    CONSTRAINT CK_ai_evidence_correction_json CHECK (correction_json IS NULL OR ISJSON(correction_json) = 1)
+);
+GO
+
+IF OBJECT_ID('dbo.ai_fusion_runs', 'U') IS NULL
+CREATE TABLE dbo.ai_fusion_runs (
+    id                  INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_ai_fusion_runs PRIMARY KEY,
+    slide_id            INT NOT NULL CONSTRAINT FK_ai_fusion_runs_slide REFERENCES dbo.slides(id) ON DELETE CASCADE,
+    case_id             INT NOT NULL CONSTRAINT FK_ai_fusion_runs_case REFERENCES dbo.cases(id),
+    requested_by        VARCHAR(255) NOT NULL,
+    status              VARCHAR(30) NOT NULL CONSTRAINT DF_ai_fusion_runs_status DEFAULT ('Completed'),
+    parameters_json     NVARCHAR(MAX) NOT NULL,
+    summary_json        NVARCHAR(MAX) NULL,
+    evidence_count      INT NOT NULL CONSTRAINT DF_ai_fusion_runs_ev DEFAULT (0),
+    group_count         INT NOT NULL CONSTRAINT DF_ai_fusion_runs_grp DEFAULT (0),
+    created_at          DATETIME2 NOT NULL CONSTRAINT DF_ai_fusion_runs_created DEFAULT (SYSUTCDATETIME()),
+    completed_at        DATETIME2 NULL
+);
+GO
+
+IF OBJECT_ID('dbo.ai_fusion_groups', 'U') IS NULL
+CREATE TABLE dbo.ai_fusion_groups (
+    id                  INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_ai_fusion_groups PRIMARY KEY,
+    run_id              INT NOT NULL CONSTRAINT FK_ai_fusion_groups_run REFERENCES dbo.ai_fusion_runs(id) ON DELETE CASCADE,
+    group_key           VARCHAR(80) NOT NULL,
+    classification      VARCHAR(40) NOT NULL,
+    geometry_json       NVARCHAR(MAX) NOT NULL,
+    rationale_json      NVARCHAR(MAX) NOT NULL,
+    uncertainty_json    NVARCHAR(MAX) NOT NULL,
+    member_count        INT NOT NULL CONSTRAINT DF_ai_fusion_groups_members DEFAULT (0),
+    created_at          DATETIME2 NOT NULL CONSTRAINT DF_ai_fusion_groups_created DEFAULT (SYSUTCDATETIME())
+);
+GO
+
+IF OBJECT_ID('dbo.ai_fusion_group_members', 'U') IS NULL
+CREATE TABLE dbo.ai_fusion_group_members (
+    id                      INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_ai_fusion_group_members PRIMARY KEY,
+    group_id                INT NOT NULL CONSTRAINT FK_ai_fusion_group_members_group REFERENCES dbo.ai_fusion_groups(id) ON DELETE CASCADE,
+    evidence_finding_id     INT NOT NULL,
+    role                    VARCHAR(40) NOT NULL CONSTRAINT DF_ai_fusion_member_role DEFAULT ('participant'),
+    relationship_tags_json  NVARCHAR(MAX) NULL,
+    CONSTRAINT UQ_ai_fusion_group_member UNIQUE (group_id, evidence_finding_id)
+);
+GO
+
+-- ------------------------------------------------------------------------------
 -- 8. SYSTEM CONFIGURATION & EXTERNAL INTEGRATIONS
 -- ------------------------------------------------------------------------------
 
