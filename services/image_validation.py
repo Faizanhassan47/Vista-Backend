@@ -154,6 +154,37 @@ def _validate_wsi(path: Path, openslide_module) -> dict[str, Any]:
         raise ImageValidationError("File is corrupt, incomplete, or not readable by OpenSlide") from exc
 
 
+def inspect_nrrd(path: Path) -> dict[str, Any]:
+    from services.nrrd_reader import open_scalar_volume
+
+    image = open_scalar_volume(path)
+    shape = tuple(int(part) for part in image.shape)
+    zooms = tuple(float(part) for part in image.header.get_zooms()[:3])
+    return {
+        "file_type": "nifti",
+        "format": "NRRD",
+        "width": shape[0],
+        "height": shape[1],
+        "level_count": shape[2],
+        "file_size": path.stat().st_size,
+        "checksum_sha256": calculate_sha256(path),
+        "normalized_metadata": {"slide_label": path.name, "barcode": None, "scanner_vendor": None, "scanner_model": None, "magnification": None, "acquisition_time": None},
+        "physical_calibration": {"available": all(value > 0 for value in zooms), "pixel_size_microns_x": zooms[0] * 1000, "pixel_size_microns_y": zooms[1] * 1000, "source": "NRRD space directions" if all(value > 0 for value in zooms) else None},
+        "renderer_type": "nifti-volume",
+        "nifti": {"shape": shape, "zooms": zooms},
+    }
+
+
+def _looks_like_nrrd(path: Path) -> bool:
+    if not path.is_file() or path.suffix.lower() in {".nii", ".gz", ".dcm", ".dicom"}:
+        return False
+    try:
+        with path.open("rb") as handle:
+            return handle.read(4) == b"NRRD"
+    except OSError:
+        return False
+
+
 def inspect_nifti(path: Path) -> dict[str, Any]:
     name = path.name.lower()
     if not (name.endswith(".nii") or name.endswith(".nii.gz")):
@@ -188,7 +219,10 @@ def inspect_nifti(path: Path) -> dict[str, Any]:
 def validate_image_file(path: Path, openslide_module=None) -> dict[str, Any]:
     path = Path(path)
     suffix = path.suffix.lower()
-    if path.name.lower().endswith(".nii") or path.name.lower().endswith(".nii.gz"):
+    if path.suffix.lower() in {".nrrd", ".nhdr"} or _looks_like_nrrd(path):
+        details = inspect_nrrd(path)
+        suffix = path.suffix.lower() or ".nrrd"
+    elif path.name.lower().endswith(".nii") or path.name.lower().endswith(".nii.gz"):
         details = inspect_nifti(path)
         suffix = ".nii.gz" if path.name.lower().endswith(".nii.gz") else ".nii"
     elif path.is_dir() or suffix in DICOM_EXTENSIONS or (path.is_file() and _looks_like_dicom(path)):
