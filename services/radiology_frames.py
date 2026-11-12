@@ -98,21 +98,48 @@ def _dicom_frame_pixels(dataset, frame_index: int = 0):
 
 
 def _apply_modality_values(dataset, pixels):
+    """Apply modality calibration once. Never applies VOI/windowing to 0–255 display."""
     from pydicom.pixels import apply_modality_lut
 
-    try:
-        values = apply_modality_lut(pixels, dataset).astype(np.float32)
-    except Exception:
-        slope = float(getattr(dataset, "RescaleSlope", 1) or 1)
-        intercept = float(getattr(dataset, "RescaleIntercept", 0) or 0)
-        values = pixels.astype(np.float32) * slope + intercept
+    raw = np.asarray(pixels)
+    has_modality_lut = bool(getattr(dataset, "ModalityLUTSequence", None))
+    has_rescale = hasattr(dataset, "RescaleSlope") or hasattr(dataset, "RescaleIntercept")
+    slope = float(getattr(dataset, "RescaleSlope", 1) or 1)
+    intercept = float(getattr(dataset, "RescaleIntercept", 0) or 0)
+
+    if has_modality_lut:
+        try:
+            values = apply_modality_lut(raw, dataset)
+        except Exception:
+            values = raw.astype(np.float32) * slope + intercept
+    elif has_rescale:
+        # Explicit single rescale — avoids any display/VOI path.
+        values = raw.astype(np.float32, copy=False) * slope + intercept
+    else:
+        try:
+            values = apply_modality_lut(raw, dataset)
+        except Exception:
+            values = raw.astype(np.float32, copy=False)
+
+    values = np.asarray(values, dtype=np.float32)
     padding = getattr(dataset, "PixelPaddingValue", None)
     if padding is not None:
         try:
-            values = np.where(pixels.astype(np.float32) == float(padding), np.nan, values)
+            values = np.where(raw.astype(np.float32) == float(padding), np.nan, values)
         except (TypeError, ValueError):
             pass
     return values
+
+
+def _volume_scalar_stats(values: np.ndarray) -> dict:
+    finite = values[np.isfinite(values)]
+    if finite.size == 0:
+        return {"value_min": None, "value_max": None, "dtype": str(values.dtype)}
+    return {
+        "value_min": float(finite.min()),
+        "value_max": float(finite.max()),
+        "dtype": "float32",
+    }
 
 
 def calibrated_ct_pixels(dataset, frame_index: int = 0):
@@ -341,17 +368,25 @@ def nifti_threshold_png(path, plane: str, index: int, low: float, high: float, c
     return payload, stats
 
 
-def _resample_axis(volume: np.ndarray, axis: int, new_size: int) -> np.ndarray:
+def _resample_axis(volume: np.ndarray, axis: int, new_size: int, nearest: bool = False) -> np.ndarray:
     import cv2
     if volume.shape[axis] == new_size:
         return volume
     moved = np.moveaxis(volume, axis, 0)
     flat = np.ascontiguousarray(moved.reshape(moved.shape[0], -1))
-    resized = cv2.resize(flat, (flat.shape[1], new_size), interpolation=cv2.INTER_LINEAR)
+    # Nearest keeps calibrated HU/intensity labels intact for thresholding; linear blends invent values.
+    interpolation = cv2.INTER_NEAREST if nearest else cv2.INTER_LINEAR
+    resized = cv2.resize(flat, (flat.shape[1], new_size), interpolation=interpolation)
     return np.moveaxis(resized.reshape((new_size,) + moved.shape[1:]), 0, axis)
 
 
-def _downsample(volume: np.ndarray, spacings: tuple[float, float, float], quality: str = "high"):
+def _downsample(
+    volume: np.ndarray,
+    spacings: tuple[float, float, float],
+    quality: str = "high",
+    *,
+    nearest: bool = False,
+):
     limit = QUALITY_VOXELS.get(quality, QUALITY_VOXELS["balanced"])
     voxels = int(np.prod(volume.shape))
     if voxels <= limit:
@@ -360,7 +395,7 @@ def _downsample(volume: np.ndarray, spacings: tuple[float, float, float], qualit
     target = tuple(max(1, int(round(size * factor))) for size in volume.shape)
     reduced = volume
     for axis, size in enumerate(target):
-        reduced = _resample_axis(reduced, axis, size)
+        reduced = _resample_axis(reduced, axis, size, nearest=nearest)
     spacing = tuple(old * (src / dst) for old, src, dst in zip(spacings, volume.shape, reduced.shape))
     return np.ascontiguousarray(reduced), spacing, True
 
@@ -370,14 +405,19 @@ def nifti_volume_bytes(path, quality: str = "preview") -> tuple[bytes, dict]:
     import nibabel as nib
     path = Path(path)
     chosen = quality if quality in QUALITY_VOXELS else "preview"
-    cache_key = ("nifti", str(path.resolve()), path.stat().st_mtime_ns, chosen)
+    # calibrated-v2: get_fdata applies scl_slope/scl_inter; nearest downsample preserves scalars
+    cache_key = ("nifti", str(path.resolve()), path.stat().st_mtime_ns, chosen, "calibrated-v2")
     cached = _volume_cache_get(cache_key)
     if cached is not None:
         return cached
     image = nib.load(str(path))
-    values = np.asanyarray(image.dataobj, dtype=np.float32)
+    # get_fdata applies NIfTI scl_slope/scl_inter exactly once (asanyarray(..., dtype=) can skip scaling).
+    values = np.ascontiguousarray(image.get_fdata(dtype=np.float32))
+    values = np.where(np.isfinite(values), values, np.float32(-3024.0))
     zooms = tuple(float(value) for value in image.header.get_zooms()[:3])
-    values, zooms, preview = _downsample(values, zooms, chosen)
+    values, zooms, preview = _downsample(values, zooms, chosen, nearest=True)
+    values = np.ascontiguousarray(values, dtype=np.float32)
+    stats = _volume_scalar_stats(values)
     payload = (
         values.tobytes(order="F"),
         {
@@ -387,10 +427,63 @@ def nifti_volume_bytes(path, quality: str = "preview") -> tuple[bytes, dict]:
             "quality": chosen,
             "order": "source-axes",
             "dtype": "float32",
+            **stats,
         },
     )
     _volume_cache_put(cache_key, payload)
     return payload
+
+
+def _dicom_slice_spacing_mm(datasets) -> tuple[float, str]:
+    """Median spacing along the series normal from ImagePositionPatient, else SpacingBetweenSlices."""
+    positions = []
+    normal = None
+    for dataset in datasets:
+        ipp = getattr(dataset, "ImagePositionPatient", None)
+        iop = getattr(dataset, "ImageOrientationPatient", None)
+        if ipp is None or len(ipp) < 3:
+            continue
+        try:
+            pos = np.asarray([float(ipp[0]), float(ipp[1]), float(ipp[2])], dtype=np.float64)
+        except (TypeError, ValueError):
+            continue
+        if normal is None and iop is not None and len(iop) >= 6:
+            try:
+                row = np.asarray([float(iop[0]), float(iop[1]), float(iop[2])], dtype=np.float64)
+                col = np.asarray([float(iop[3]), float(iop[4]), float(iop[5])], dtype=np.float64)
+                candidate = np.cross(row, col)
+                norm = float(np.linalg.norm(candidate))
+                if norm > 1e-6:
+                    normal = candidate / norm
+            except (TypeError, ValueError):
+                normal = None
+        positions.append(pos)
+    if len(positions) >= 2:
+        if normal is None:
+            normal = np.array([0.0, 0.0, 1.0], dtype=np.float64)
+        projections = [float(np.dot(pos, normal)) for pos in positions]
+        projections.sort()
+        deltas = [abs(b - a) for a, b in zip(projections, projections[1:]) if abs(b - a) > 1e-4]
+        if deltas:
+            return float(np.median(deltas)), "ImagePositionPatient"
+    for dataset in datasets:
+        between = getattr(dataset, "SpacingBetweenSlices", None)
+        if between is not None:
+            try:
+                value = abs(float(between))
+            except (TypeError, ValueError):
+                continue
+            if value > 1e-4:
+                return value, "SpacingBetweenSlices"
+        thickness = getattr(dataset, "SliceThickness", None)
+        if thickness is not None:
+            try:
+                value = abs(float(thickness))
+            except (TypeError, ValueError):
+                continue
+            if value > 1e-4:
+                return value, "SliceThickness"
+    return 1.0, "default"
 
 
 def dicom_volume_bytes(instances, quality: str = "preview") -> tuple[bytes, dict]:
@@ -399,28 +492,38 @@ def dicom_volume_bytes(instances, quality: str = "preview") -> tuple[bytes, dict
         raise ImageValidationError("A single image or short series is not reconstructed as a 3D volume")
     chosen = quality if quality in QUALITY_VOXELS else "preview"
     stamp = tuple((str(path), path.stat().st_mtime_ns) for path in instances)
-    cache_key = ("dicom", stamp, chosen)
+    cache_key = ("dicom", stamp, chosen, "calibrated-v2")
     cached = _volume_cache_get(cache_key)
     if cached is not None:
         return cached
+    datasets = [pydicom.dcmread(str(path)) for path in instances]
     frames = []
     spacing = None
-    for path in instances:
-        dataset = pydicom.dcmread(str(path))
+    intensity_unit = "native"
+    for dataset in datasets:
         modality = str(getattr(dataset, "Modality", "") or "").upper()
         if modality == "CT":
             try:
-                frames.append(calibrated_ct_pixels(dataset))
+                frame = calibrated_ct_pixels(dataset)
+                intensity_unit = "HU"
             except ImageValidationError:
-                frames.append(dicom_intensity_pixels(dataset))
+                frame = dicom_intensity_pixels(dataset)
         else:
-            frames.append(dicom_intensity_pixels(dataset))
+            frame = dicom_intensity_pixels(dataset)
+        # Guard: volume scalars must stay float calibrated values, never display uint8.
+        frame = np.asarray(frame, dtype=np.float32)
+        if frame.ndim != 2:
+            raise ImageValidationError("DICOM volume frames must be single-channel 2D slices")
+        frames.append(frame)
         if spacing is None:
             raw = getattr(dataset, "PixelSpacing", None)
             spacing = (float(raw[0]), float(raw[1])) if raw is not None and len(raw) == 2 else (1.0, 1.0)
     stack = np.stack(frames, axis=2)
-    slice_spacing = 1.0
-    values, zooms, preview = _downsample(stack.astype(np.float32), (spacing[1], spacing[0], slice_spacing), chosen)
+    stack = np.where(np.isfinite(stack), stack, np.float32(-3024.0))
+    slice_spacing, spacing_source = _dicom_slice_spacing_mm(datasets)
+    values, zooms, preview = _downsample(stack, (spacing[1], spacing[0], slice_spacing), chosen, nearest=True)
+    values = np.ascontiguousarray(values, dtype=np.float32)
+    stats = _volume_scalar_stats(values)
     payload = (
         values.tobytes(order="F"),
         {
@@ -430,7 +533,9 @@ def dicom_volume_bytes(instances, quality: str = "preview") -> tuple[bytes, dict
             "quality": chosen,
             "order": "source-axes",
             "dtype": "float32",
-            "spacing_note": "in-plane spacing from PixelSpacing; slice spacing is 1 mm unless positions were used only for ordering",
+            "intensity_unit": intensity_unit,
+            "spacing_note": f"in-plane from PixelSpacing; slice spacing from {spacing_source}",
+            **stats,
         },
     )
     _volume_cache_put(cache_key, payload)
