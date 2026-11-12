@@ -17,6 +17,7 @@ pylibjpeg
 pylibjpeg-libjpeg
 pylibjpeg-openjpeg
 nibabel
+pynrrd
 pystrich
 boto3
 pydantic-settings
