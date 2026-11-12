@@ -871,7 +871,7 @@ def create_cases_router(
             raise HTTPException(400, str(exc)) from exc
         dimensions = info["dimensions"]
         spacing = info["spacing"]
-        return Response(payload, media_type="application/octet-stream", headers={
+        headers = {
             "X-Dim-I": str(dimensions[0]),
             "X-Dim-J": str(dimensions[1]),
             "X-Dim-K": str(dimensions[2]),
@@ -881,8 +881,16 @@ def create_cases_router(
             "X-Preview": "1" if info["preview"] else "0",
             "X-Quality": str(info.get("quality") or quality),
             "X-Order": info["order"],
+            "X-Dtype": str(info.get("dtype") or "float32"),
             "Cache-Control": "private, max-age=300",
-        })
+        }
+        if info.get("value_min") is not None:
+            headers["X-Value-Min"] = str(info["value_min"])
+        if info.get("value_max") is not None:
+            headers["X-Value-Max"] = str(info["value_max"])
+        if info.get("intensity_unit"):
+            headers["X-Intensity-Unit"] = str(info["intensity_unit"])
+        return Response(payload, media_type="application/octet-stream", headers=headers)
 
     @router.get("/api/slides/{slide_id}/image", dependencies=[Depends(require_roles(CLINICAL_READ_ROLES))])
     def slide_image(slide_id: int, current_user: dict = Depends(get_current_user)):

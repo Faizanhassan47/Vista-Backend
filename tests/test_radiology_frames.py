@@ -11,6 +11,7 @@ from pydicom.dataset import Dataset
 from services.radiology_frames import _apply_modality_values, _downsample, _mask_png_from_values, dicom_intensity_mask_png, dicom_thumbnail_jpeg, hu_mask_png, nifti_calibration, nifti_plane_counts, nifti_volume_bytes, render_dicom_frame, render_nifti_slice
 
 SAMPLE = Path(__file__).resolve().parents[1] / ".venv" / "Lib" / "site-packages" / "pydicom" / "data" / "test_files" / "693_J2KI.dcm"
+CT_SMALL = Path(__file__).resolve().parents[1] / ".venv" / "Lib" / "site-packages" / "pydicom" / "data" / "test_files" / "CT_small.dcm"
 
 
 def test_jpeg2000_ct_decodes_to_visible_png():
@@ -123,3 +124,44 @@ def test_jpeg2000_thumbnail_is_jpeg():
     image = Image.open(BytesIO(payload))
     assert image.format == "JPEG"
     assert image.size[0] <= 512
+
+
+def test_dicom_volume_preserves_calibrated_hu(tmp_path):
+    """3D volume scalars must stay in HU — never display-windowed to 0–255."""
+    import shutil
+
+    assert CT_SMALL.is_file()
+    dataset = pydicom.dcmread(str(CT_SMALL))
+    frame = calibrated_ct_pixels(dataset)
+    assert float(np.nanmin(frame)) < -500
+    assert float(np.nanmax(frame)) > 400
+
+    instances = []
+    for index in range(12):
+        target = tmp_path / f"ct_{index:03d}.dcm"
+        shutil.copy(CT_SMALL, target)
+        instances.append(target)
+
+    payload, info = dicom_volume_bytes(instances, "preview")
+    values = np.frombuffer(payload, dtype=np.float32)
+    assert info["dtype"] == "float32"
+    assert info["intensity_unit"] == "HU"
+    assert info["value_min"] < -500
+    assert info["value_max"] > 400
+    assert float(values.min()) < -500
+    assert float(values.max()) > 400
+    # Must not look like 8-bit display data.
+    assert not (0 <= float(values.min()) <= 1 and 200 <= float(values.max()) <= 255)
+
+
+def test_nifti_volume_preserves_native_intensities(tmp_path):
+    volume = np.zeros((32, 32, 16), dtype=np.float32)
+    volume[8:24, 8:24, 4:12] = 180.0
+    volume[10:14, 10:14, 6:10] = 900.0
+    path = tmp_path / "native.nii"
+    nib.save(nib.Nifti1Image(volume, np.eye(4)), path)
+    payload, info = nifti_volume_bytes(path, "preview")
+    values = np.frombuffer(payload, dtype=np.float32)
+    assert info["dtype"] == "float32"
+    assert info["value_max"] >= 180
+    assert float(values.max()) >= 180
