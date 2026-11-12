@@ -716,11 +716,22 @@ def create_cases_router(
                     suffix = ".nii.gz"
                 else:
                     suffix = Path(name).suffix.lower()
-                if suffix not in {".dcm", ".dicom", ".nii", ".nii.gz"} and not name.lower().endswith(".nii.gz"):
-                    raise HTTPException(400, f"{name} is not a DICOM or NIfTI file")
+                if suffix not in {".dcm", ".dicom", ".nii", ".nii.gz", ".nrrd", ".nhdr"} and not name.lower().endswith(".nii.gz") and suffix:
+                    raise HTTPException(400, f"{name} is not a DICOM, NIfTI, or NRRD file")
                 target = folder / name
                 await _save_stream(upload, target, WSI_MAX_BYTES)
-            validation = validate_image_file(folder if any(path.suffix.lower() in {".dcm", ".dicom"} or _dicom_magic(path) for path in folder.iterdir()) else next(folder.iterdir()), openslide)
+            members = list(folder.iterdir())
+            def _nrrd_header(path: Path) -> bool:
+                if path.suffix.lower() in {".nrrd", ".nhdr"}:
+                    return True
+                try:
+                    with path.open("rb") as handle:
+                        return handle.read(4) == b"NRRD"
+                except OSError:
+                    return False
+
+            nrrd_header = next((path for path in members if _nrrd_header(path)), None)
+            validation = validate_image_file(folder if any(path.suffix.lower() in {".dcm", ".dicom"} or _dicom_magic(path) for path in members) else (nrrd_header or members[0]), openslide)
             anchor = Path(validation.get("anchor") or next(folder.iterdir()))
             filename = f"{folder_name}/{anchor.name}"
             row = _record_validation(case_pk, label.strip() or "Imaging", "", "", filename, validation)
