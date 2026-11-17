@@ -8,7 +8,7 @@ import nibabel as nib
 
 from pydicom.dataset import Dataset
 
-from services.radiology_frames import _apply_modality_values, _downsample, _mask_png_from_values, dicom_intensity_mask_png, dicom_thumbnail_jpeg, hu_mask_png, nifti_calibration, nifti_plane_counts, nifti_volume_bytes, render_dicom_frame, render_nifti_slice
+from services.radiology_frames import _apply_modality_values, _downsample, _mask_png_from_values, dicom_intensity_mask_png, dicom_thumbnail_jpeg, hu_mask_png, nifti_calibration, nifti_plane_counts, nifti_threshold_png, nifti_volume_bytes, render_dicom_frame, render_nifti_slice
 
 SAMPLE = Path(__file__).resolve().parents[1] / ".venv" / "Lib" / "site-packages" / "pydicom" / "data" / "test_files" / "693_J2KI.dcm"
 CT_SMALL = Path(__file__).resolve().parents[1] / ".venv" / "Lib" / "site-packages" / "pydicom" / "data" / "test_files" / "CT_small.dcm"
@@ -92,6 +92,13 @@ def test_nifti_planes_use_voxel_spacing(tmp_path):
     assert sagittal.size == (6, 16)
 
 
+def test_mask_skips_padding_and_nonfinite_values():
+    values = np.array([[-3024, -800, np.nan], [40, np.inf, -950]], dtype=np.float32)
+    _png, stats = _mask_png_from_values(values, -950, -600, "red")
+    assert stats["matching_pixels"] == 2
+    assert stats["eligible_pixels"] == 4
+
+
 def test_threshold_interval_is_inclusive_and_exact():
     values = np.array([-1024, -950, -500, -190, 40, 300, 1500], dtype=np.float32)
     lung = (values >= -950) & (values <= -500)
@@ -100,6 +107,54 @@ def test_threshold_interval_is_inclusive_and_exact():
     assert exact.tolist() == [False, False, False, False, False, True, False]
     empty = (values >= 1300) & (values <= 1400)
     assert not empty.any()
+
+
+def test_lung_and_bone_ranges_match_slice_and_volume(tmp_path):
+    volume = np.full((4, 4, 3), -1000, dtype=np.float32)
+    volume[1, 1, 1] = -800
+    volume[1, 2, 1] = -950
+    volume[2, 1, 1] = -600
+    volume[2, 2, 1] = -500
+    volume[0, 0, 1] = 40
+    volume[0, 1, 1] = 400
+    volume[0, 2, 1] = 1500
+    volume[3, 3, 1] = np.nan
+    image = nib.Nifti1Image(np.nan_to_num(volume, nan=-3024), np.eye(4))
+    path = tmp_path / "tissues.nii"
+    nib.save(image, path)
+    _png, lung = nifti_threshold_png(path, "axial", 1, -950, -600, "blue")
+    assert lung["matching_pixels"] == 3
+    _png, bone = nifti_threshold_png(path, "axial", 1, 400, 1500, "red")
+    assert bone["matching_pixels"] == 2
+    _png, empty = nifti_threshold_png(path, "axial", 1, 2000, 3000, "red")
+    assert empty["matching_pixels"] == 0
+    payload, info = nifti_volume_bytes(path, quality="high")
+    loaded = np.frombuffer(payload, dtype=np.float32).reshape(info["dimensions"], order="F")
+    assert int(((loaded >= -950) & (loaded <= -600)).sum()) == 3
+    assert int(((loaded >= 400) & (loaded <= 1500)).sum()) == 2
+    assert int(((loaded >= 2000) & (loaded <= 3000)).sum()) == 0
+
+
+def test_lung_range_matches_on_slice_and_in_volume_bytes(tmp_path):
+    volume = np.full((4, 4, 3), -1000, dtype=np.float32)
+    volume[1, 1, 1] = -700
+    volume[1, 2, 1] = -950
+    volume[2, 1, 1] = -450
+    volume[2, 2, 1] = -449
+    volume[0, 0, 1] = 40
+    volume[3, 3, 1] = 800
+    image = nib.Nifti1Image(volume, np.eye(4))
+    path = tmp_path / "lung.nii"
+    nib.save(image, path)
+    _png, stats = nifti_threshold_png(path, "axial", 1, -950, -450, "blue")
+    assert stats["matching_pixels"] == 3
+    assert stats["value_min"] == -1000
+    assert stats["value_max"] == 800
+    payload, info = nifti_volume_bytes(path, quality="high")
+    loaded = np.frombuffer(payload, dtype=np.float32).reshape(info["dimensions"], order="F")
+    selected = (loaded >= -950) & (loaded <= -450)
+    assert int(selected.sum()) == 3
+    assert set(np.unique(loaded).tolist()) == {-1000.0, -950.0, -700.0, -450.0, -449.0, 40.0, 800.0}
 
 
 def test_volume_downsample_keeps_source_samples(tmp_path):

@@ -452,7 +452,7 @@ def nifti_volume_bytes(path, quality: str = "preview") -> tuple[bytes, dict]:
             "quality": chosen,
             "order": "source-axes",
             "dtype": "float32",
-            **stats,
+            **_volume_scalar_stats(values),
         },
     )
     _volume_cache_put(cache_key, payload)
@@ -544,7 +544,7 @@ def dicom_volume_bytes(instances, quality: str = "preview") -> tuple[bytes, dict
             raw = getattr(dataset, "PixelSpacing", None)
             spacing = (float(raw[0]), float(raw[1])) if raw is not None and len(raw) == 2 else (1.0, 1.0)
     stack = np.stack(frames, axis=2)
-    slice_spacing = 1.0
+    slice_spacing, spacing_source = _dicom_slice_spacing_mm(datasets)
     # Nearest keeps original HU samples. Linear resizing would invent attenuation values.
     values, zooms, preview = _downsample(stack.astype(np.float32), (spacing[1], spacing[0], slice_spacing), chosen, nearest=True)
     payload = (
@@ -558,7 +558,6 @@ def dicom_volume_bytes(instances, quality: str = "preview") -> tuple[bytes, dict
             "dtype": "float32",
             "intensity_unit": intensity_unit,
             "spacing_note": f"in-plane from PixelSpacing; slice spacing from {spacing_source}",
-            **stats,
         },
     )
     _volume_cache_put(cache_key, payload)
