@@ -768,7 +768,7 @@ def create_cases_router(
             "id": slide["id"],
             "file_type": slide["file_type"],
             "format": slide["format"],
-            "modality": metadata.get("modality") or slide["format"],
+            "modality": metadata.get("modality"),
             "instance_count": slide["level_count"],
             "plane_counts": plane_counts,
             "width": slide["width"],

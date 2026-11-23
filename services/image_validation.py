@@ -241,11 +241,17 @@ def validate_image_file(path: Path, openslide_module=None) -> dict[str, Any]:
         details = _validate_raster(path) if suffix in RASTER_EXTENSIONS else _validate_wsi(path, openslide_module)
         details["file_size"] = file_size
         details["checksum_sha256"] = calculate_sha256(path)
-    
-    # Run deterministic image QC
+
+    qc_input = path
+    if details.get("file_type") == "wsi" and openslide_module is not None:
+        try:
+            with openslide_module.OpenSlide(str(path)) as slide:
+                qc_input = slide.get_thumbnail((512, 512))
+        except Exception:
+            qc_input = path
     try:
         from services.image_qc import compute_deterministic_qc
-        qc_metrics = compute_deterministic_qc(path)
+        qc_metrics = compute_deterministic_qc(qc_input)
     except Exception:
         qc_metrics = {"qc_status": "Unverified", "flags": [], "sharpness_score": None}
 

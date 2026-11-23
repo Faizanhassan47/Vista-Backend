@@ -1,6 +1,8 @@
 """Upload case and slide files to iDrive e2 under a patient-CNIC prefix."""
 
+import logging
 import re
+import threading
 
 from fastapi import HTTPException
 
@@ -14,6 +16,7 @@ from core.config import (
 )
 
 UNLINKED_PREFIX = "unlinked"
+logger = logging.getLogger("pathology.storage")
 
 
 def patient_folder(cnic: str | None, patient_name: str | None = None) -> str:
@@ -61,26 +64,45 @@ def _client():
         aws_access_key_id=IDRIVE_E2_ACCESS_KEY_ID,
         aws_secret_access_key=IDRIVE_E2_SECRET_ACCESS_KEY,
         region_name=IDRIVE_E2_REGION,
-        config=Config(signature_version="s3v4", s3={"addressing_style": "virtual"}),
+        config=Config(
+            signature_version="s3v4",
+            connect_timeout=10,
+            read_timeout=120,
+            retries={"max_attempts": 2, "mode": "standard"},
+            s3={"addressing_style": "virtual"},
+        ),
     )
 
 
-def upload_case_file(local_path, cnic: str | None, filename: str, patient_name: str | None = None) -> str | None:
-    """Copy a validated slide into bucket/{CNIC patient name}/. Returns the object key."""
+def _upload_case_file(local_path, cnic, filename, patient_name):
     client = _client()
     if client is None:
         return None
     key = object_key(cnic, filename, patient_name)
-    try:
-        client.upload_file(str(local_path), IDRIVE_E2_BUCKET, key)
-        legacy_key = object_key(None, filename)
-        if legacy_key != key:
-            client.delete_object(Bucket=IDRIVE_E2_BUCKET, Key=legacy_key)
-    except HTTPException:
-        raise
-    except Exception as exc:
-        raise HTTPException(502, "Slide could not be stored in iDrive e2") from exc
+    client.upload_file(str(local_path), IDRIVE_E2_BUCKET, key)
+    legacy_key = object_key(None, filename)
+    if legacy_key != key:
+        client.delete_object(Bucket=IDRIVE_E2_BUCKET, Key=legacy_key)
     return key
+
+
+def upload_case_file(local_path, cnic: str | None, filename: str, patient_name: str | None = None) -> str | None:
+    """Copy a validated slide into bucket/{CNIC patient name}/.
+
+    The copy runs after the local file is already saved. A slow or failed
+    remote copy must not keep the upload request open or delete the local slide.
+    """
+    if not IDRIVE_E2_ENABLED:
+        return None
+
+    def send():
+        try:
+            _upload_case_file(local_path, cnic, filename, patient_name)
+        except Exception:
+            logger.exception("iDrive e2 copy failed for %s; the local slide was kept", filename)
+
+    threading.Thread(target=send, name="idrive-e2-upload", daemon=True).start()
+    return None
 
 
 def relocate_case_file(filename: str, cnic: str | None, patient_name: str | None = None) -> str | None:

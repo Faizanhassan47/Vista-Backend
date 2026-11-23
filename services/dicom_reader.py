@@ -143,19 +143,22 @@ def _radiology_series(anchor: Path) -> dict[str, Any]:
         )
     series_uid = _text(seed, "SeriesInstanceUID")
     study_uid = _text(seed, "StudyInstanceUID")
-    if not series_uid or not study_uid:
-        raise ImageValidationError("DICOM series is missing Study or Series UID")
+    # Some single-image exports omit the study and series identifiers.
+    # Keep that one file instead of rejecting the upload.
+    if not series_uid:
+        series_uid = _text(seed, "SOPInstanceUID") or f"file-{anchor.name}"
+        files = [anchor if anchor.is_file() else files[0]]
+    if not study_uid:
+        study_uid = series_uid
     instances = []
     seen = set()
     for path in files:
         dataset = _dataset(path)
-        if _text(dataset, "SeriesInstanceUID") != series_uid:
+        if _text(seed, "SeriesInstanceUID") and _text(dataset, "SeriesInstanceUID") != series_uid:
             continue
         if _text(dataset, "SOPClassUID") != sop_class:
             continue
-        sop_instance = _text(dataset, "SOPInstanceUID")
-        if not sop_instance:
-            raise ImageValidationError(f"{path.name} is missing a SOP Instance UID")
+        sop_instance = _text(dataset, "SOPInstanceUID") or f"file-{path.name}"
         if sop_instance in seen:
             raise ImageValidationError(f"Duplicate SOP Instance UID {sop_instance}")
         seen.add(sop_instance)

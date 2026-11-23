@@ -1,0 +1,1509 @@
+{
+  "total": [
+    {
+      "id": "spleen",
+      "label": "Spleen",
+      "category": "Abdominal organs",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 1,
+      "supported": true
+    },
+    {
+      "id": "kidney_right",
+      "label": "Right kidney",
+      "category": "Abdominal organs",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 2,
+      "supported": true
+    },
+    {
+      "id": "kidney_left",
+      "label": "Left kidney",
+      "category": "Abdominal organs",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 3,
+      "supported": true
+    },
+    {
+      "id": "gallbladder",
+      "label": "Gallbladder",
+      "category": "Abdominal organs",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 4,
+      "supported": true
+    },
+    {
+      "id": "liver",
+      "label": "Liver",
+      "category": "Abdominal organs",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 5,
+      "supported": true
+    },
+    {
+      "id": "stomach",
+      "label": "Stomach",
+      "category": "Abdominal organs",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 6,
+      "supported": true
+    },
+    {
+      "id": "pancreas",
+      "label": "Pancreas",
+      "category": "Abdominal organs",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 7,
+      "supported": true
+    },
+    {
+      "id": "adrenal_gland_right",
+      "label": "Right Adrenal Gland",
+      "category": "Abdominal organs",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 8,
+      "supported": true
+    },
+    {
+      "id": "adrenal_gland_left",
+      "label": "Left Adrenal Gland",
+      "category": "Abdominal organs",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 9,
+      "supported": true
+    },
+    {
+      "id": "lung_upper_lobe_left",
+      "label": "Left Lung Upper Lobe",
+      "category": "Thoracic organs",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 10,
+      "supported": true
+    },
+    {
+      "id": "lung_lower_lobe_left",
+      "label": "Left Lung Lower Lobe",
+      "category": "Thoracic organs",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 11,
+      "supported": true
+    },
+    {
+      "id": "lung_upper_lobe_right",
+      "label": "Right Lung Upper Lobe",
+      "category": "Thoracic organs",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 12,
+      "supported": true
+    },
+    {
+      "id": "lung_middle_lobe_right",
+      "label": "Right Lung Middle Lobe",
+      "category": "Thoracic organs",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 13,
+      "supported": true
+    },
+    {
+      "id": "lung_lower_lobe_right",
+      "label": "Right Lung Lower Lobe",
+      "category": "Thoracic organs",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 14,
+      "supported": true
+    },
+    {
+      "id": "esophagus",
+      "label": "Esophagus",
+      "category": "Thoracic organs",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 15,
+      "supported": true
+    },
+    {
+      "id": "trachea",
+      "label": "Trachea",
+      "category": "Thoracic organs",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 16,
+      "supported": true
+    },
+    {
+      "id": "thyroid_gland",
+      "label": "Thyroid Gland",
+      "category": "Thoracic organs",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 17,
+      "supported": true
+    },
+    {
+      "id": "small_bowel",
+      "label": "Small Bowel",
+      "category": "Abdominal organs",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 18,
+      "supported": true
+    },
+    {
+      "id": "duodenum",
+      "label": "Duodenum",
+      "category": "Abdominal organs",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 19,
+      "supported": true
+    },
+    {
+      "id": "colon",
+      "label": "Colon",
+      "category": "Abdominal organs",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 20,
+      "supported": true
+    },
+    {
+      "id": "urinary_bladder",
+      "label": "Urinary Bladder",
+      "category": "Abdominal organs",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 21,
+      "supported": true
+    },
+    {
+      "id": "prostate",
+      "label": "Prostate",
+      "category": "Abdominal organs",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 22,
+      "supported": true
+    },
+    {
+      "id": "kidney_cyst_left",
+      "label": "Left Kidney Cyst",
+      "category": "Abdominal organs",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 23,
+      "supported": true
+    },
+    {
+      "id": "kidney_cyst_right",
+      "label": "Right Kidney Cyst",
+      "category": "Abdominal organs",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 24,
+      "supported": true
+    },
+    {
+      "id": "sacrum",
+      "label": "Sacrum",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 25,
+      "supported": true
+    },
+    {
+      "id": "vertebrae_S1",
+      "label": "Vertebrae S1",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 26,
+      "supported": true
+    },
+    {
+      "id": "vertebrae_L5",
+      "label": "Vertebrae L5",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 27,
+      "supported": true
+    },
+    {
+      "id": "vertebrae_L4",
+      "label": "Vertebrae L4",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 28,
+      "supported": true
+    },
+    {
+      "id": "vertebrae_L3",
+      "label": "Vertebrae L3",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 29,
+      "supported": true
+    },
+    {
+      "id": "vertebrae_L2",
+      "label": "Vertebrae L2",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 30,
+      "supported": true
+    },
+    {
+      "id": "vertebrae_L1",
+      "label": "Vertebrae L1",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 31,
+      "supported": true
+    },
+    {
+      "id": "vertebrae_T12",
+      "label": "Vertebrae T12",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 32,
+      "supported": true
+    },
+    {
+      "id": "vertebrae_T11",
+      "label": "Vertebrae T11",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 33,
+      "supported": true
+    },
+    {
+      "id": "vertebrae_T10",
+      "label": "Vertebrae T10",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 34,
+      "supported": true
+    },
+    {
+      "id": "vertebrae_T9",
+      "label": "Vertebrae T9",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 35,
+      "supported": true
+    },
+    {
+      "id": "vertebrae_T8",
+      "label": "Vertebrae T8",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 36,
+      "supported": true
+    },
+    {
+      "id": "vertebrae_T7",
+      "label": "Vertebrae T7",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 37,
+      "supported": true
+    },
+    {
+      "id": "vertebrae_T6",
+      "label": "Vertebrae T6",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 38,
+      "supported": true
+    },
+    {
+      "id": "vertebrae_T5",
+      "label": "Vertebrae T5",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 39,
+      "supported": true
+    },
+    {
+      "id": "vertebrae_T4",
+      "label": "Vertebrae T4",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 40,
+      "supported": true
+    },
+    {
+      "id": "vertebrae_T3",
+      "label": "Vertebrae T3",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 41,
+      "supported": true
+    },
+    {
+      "id": "vertebrae_T2",
+      "label": "Vertebrae T2",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 42,
+      "supported": true
+    },
+    {
+      "id": "vertebrae_T1",
+      "label": "Vertebrae T1",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 43,
+      "supported": true
+    },
+    {
+      "id": "vertebrae_C7",
+      "label": "Vertebrae C7",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 44,
+      "supported": true
+    },
+    {
+      "id": "vertebrae_C6",
+      "label": "Vertebrae C6",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 45,
+      "supported": true
+    },
+    {
+      "id": "vertebrae_C5",
+      "label": "Vertebrae C5",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 46,
+      "supported": true
+    },
+    {
+      "id": "vertebrae_C4",
+      "label": "Vertebrae C4",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 47,
+      "supported": true
+    },
+    {
+      "id": "vertebrae_C3",
+      "label": "Vertebrae C3",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 48,
+      "supported": true
+    },
+    {
+      "id": "vertebrae_C2",
+      "label": "Vertebrae C2",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 49,
+      "supported": true
+    },
+    {
+      "id": "vertebrae_C1",
+      "label": "Vertebrae C1",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 50,
+      "supported": true
+    },
+    {
+      "id": "heart",
+      "label": "Heart",
+      "category": "Thoracic organs",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 51,
+      "supported": true
+    },
+    {
+      "id": "aorta",
+      "label": "Aorta",
+      "category": "Blood vessels",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 52,
+      "supported": true
+    },
+    {
+      "id": "pulmonary_vein",
+      "label": "Pulmonary Vein",
+      "category": "Blood vessels",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 53,
+      "supported": true
+    },
+    {
+      "id": "brachiocephalic_trunk",
+      "label": "Brachiocephalic Trunk",
+      "category": "Blood vessels",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 54,
+      "supported": true
+    },
+    {
+      "id": "subclavian_artery_right",
+      "label": "Right Subclavian Artery",
+      "category": "Blood vessels",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 55,
+      "supported": true
+    },
+    {
+      "id": "subclavian_artery_left",
+      "label": "Left Subclavian Artery",
+      "category": "Blood vessels",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 56,
+      "supported": true
+    },
+    {
+      "id": "common_carotid_artery_right",
+      "label": "Right Common Carotid Artery",
+      "category": "Blood vessels",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 57,
+      "supported": true
+    },
+    {
+      "id": "common_carotid_artery_left",
+      "label": "Left Common Carotid Artery",
+      "category": "Blood vessels",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 58,
+      "supported": true
+    },
+    {
+      "id": "brachiocephalic_vein_left",
+      "label": "Left Brachiocephalic Vein",
+      "category": "Blood vessels",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 59,
+      "supported": true
+    },
+    {
+      "id": "brachiocephalic_vein_right",
+      "label": "Right Brachiocephalic Vein",
+      "category": "Blood vessels",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 60,
+      "supported": true
+    },
+    {
+      "id": "atrial_appendage_left",
+      "label": "Left Atrial Appendage",
+      "category": "Blood vessels",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 61,
+      "supported": true
+    },
+    {
+      "id": "superior_vena_cava",
+      "label": "Superior vena cava",
+      "category": "Blood vessels",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 62,
+      "supported": true
+    },
+    {
+      "id": "inferior_vena_cava",
+      "label": "Inferior vena cava",
+      "category": "Blood vessels",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 63,
+      "supported": true
+    },
+    {
+      "id": "portal_vein_and_splenic_vein",
+      "label": "Portal and splenic vein",
+      "category": "Blood vessels",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 64,
+      "supported": true
+    },
+    {
+      "id": "iliac_artery_left",
+      "label": "Left Iliac Artery",
+      "category": "Blood vessels",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 65,
+      "supported": true
+    },
+    {
+      "id": "iliac_artery_right",
+      "label": "Right Iliac Artery",
+      "category": "Blood vessels",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 66,
+      "supported": true
+    },
+    {
+      "id": "iliac_vena_left",
+      "label": "Left Iliac Vena",
+      "category": "Blood vessels",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 67,
+      "supported": true
+    },
+    {
+      "id": "iliac_vena_right",
+      "label": "Right Iliac Vena",
+      "category": "Blood vessels",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 68,
+      "supported": true
+    },
+    {
+      "id": "humerus_left",
+      "label": "Left Humerus",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 69,
+      "supported": true
+    },
+    {
+      "id": "humerus_right",
+      "label": "Right Humerus",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 70,
+      "supported": true
+    },
+    {
+      "id": "scapula_left",
+      "label": "Left Scapula",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 71,
+      "supported": true
+    },
+    {
+      "id": "scapula_right",
+      "label": "Right Scapula",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 72,
+      "supported": true
+    },
+    {
+      "id": "clavicula_left",
+      "label": "Left Clavicula",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 73,
+      "supported": true
+    },
+    {
+      "id": "clavicula_right",
+      "label": "Right Clavicula",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 74,
+      "supported": true
+    },
+    {
+      "id": "femur_left",
+      "label": "Left Femur",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 75,
+      "supported": true
+    },
+    {
+      "id": "femur_right",
+      "label": "Right Femur",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 76,
+      "supported": true
+    },
+    {
+      "id": "hip_left",
+      "label": "Left Hip",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 77,
+      "supported": true
+    },
+    {
+      "id": "hip_right",
+      "label": "Right Hip",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 78,
+      "supported": true
+    },
+    {
+      "id": "spinal_cord",
+      "label": "Spinal Cord",
+      "category": "Brain and head structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 79,
+      "supported": true
+    },
+    {
+      "id": "gluteus_maximus_left",
+      "label": "Left Gluteus Maximus",
+      "category": "Muscles",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 80,
+      "supported": true
+    },
+    {
+      "id": "gluteus_maximus_right",
+      "label": "Right Gluteus Maximus",
+      "category": "Muscles",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 81,
+      "supported": true
+    },
+    {
+      "id": "gluteus_medius_left",
+      "label": "Left Gluteus Medius",
+      "category": "Muscles",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 82,
+      "supported": true
+    },
+    {
+      "id": "gluteus_medius_right",
+      "label": "Right Gluteus Medius",
+      "category": "Muscles",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 83,
+      "supported": true
+    },
+    {
+      "id": "gluteus_minimus_left",
+      "label": "Left Gluteus Minimus",
+      "category": "Muscles",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 84,
+      "supported": true
+    },
+    {
+      "id": "gluteus_minimus_right",
+      "label": "Right Gluteus Minimus",
+      "category": "Muscles",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 85,
+      "supported": true
+    },
+    {
+      "id": "autochthon_left",
+      "label": "Left Autochthon",
+      "category": "Muscles",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 86,
+      "supported": true
+    },
+    {
+      "id": "autochthon_right",
+      "label": "Right Autochthon",
+      "category": "Muscles",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 87,
+      "supported": true
+    },
+    {
+      "id": "iliopsoas_left",
+      "label": "Left Iliopsoas",
+      "category": "Muscles",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 88,
+      "supported": true
+    },
+    {
+      "id": "iliopsoas_right",
+      "label": "Right Iliopsoas",
+      "category": "Muscles",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 89,
+      "supported": true
+    },
+    {
+      "id": "brain",
+      "label": "Brain",
+      "category": "Brain and head structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 90,
+      "supported": true
+    },
+    {
+      "id": "skull",
+      "label": "Skull",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 91,
+      "supported": true
+    },
+    {
+      "id": "rib_left_1",
+      "label": "Rib Left 1",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 92,
+      "supported": true
+    },
+    {
+      "id": "rib_left_2",
+      "label": "Rib Left 2",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 93,
+      "supported": true
+    },
+    {
+      "id": "rib_left_3",
+      "label": "Rib Left 3",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 94,
+      "supported": true
+    },
+    {
+      "id": "rib_left_4",
+      "label": "Rib Left 4",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 95,
+      "supported": true
+    },
+    {
+      "id": "rib_left_5",
+      "label": "Rib Left 5",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 96,
+      "supported": true
+    },
+    {
+      "id": "rib_left_6",
+      "label": "Rib Left 6",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 97,
+      "supported": true
+    },
+    {
+      "id": "rib_left_7",
+      "label": "Rib Left 7",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 98,
+      "supported": true
+    },
+    {
+      "id": "rib_left_8",
+      "label": "Rib Left 8",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 99,
+      "supported": true
+    },
+    {
+      "id": "rib_left_9",
+      "label": "Rib Left 9",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 100,
+      "supported": true
+    },
+    {
+      "id": "rib_left_10",
+      "label": "Rib Left 10",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 101,
+      "supported": true
+    },
+    {
+      "id": "rib_left_11",
+      "label": "Rib Left 11",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 102,
+      "supported": true
+    },
+    {
+      "id": "rib_left_12",
+      "label": "Rib Left 12",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 103,
+      "supported": true
+    },
+    {
+      "id": "rib_right_1",
+      "label": "Rib Right 1",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 104,
+      "supported": true
+    },
+    {
+      "id": "rib_right_2",
+      "label": "Rib Right 2",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 105,
+      "supported": true
+    },
+    {
+      "id": "rib_right_3",
+      "label": "Rib Right 3",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 106,
+      "supported": true
+    },
+    {
+      "id": "rib_right_4",
+      "label": "Rib Right 4",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 107,
+      "supported": true
+    },
+    {
+      "id": "rib_right_5",
+      "label": "Rib Right 5",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 108,
+      "supported": true
+    },
+    {
+      "id": "rib_right_6",
+      "label": "Rib Right 6",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 109,
+      "supported": true
+    },
+    {
+      "id": "rib_right_7",
+      "label": "Rib Right 7",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 110,
+      "supported": true
+    },
+    {
+      "id": "rib_right_8",
+      "label": "Rib Right 8",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 111,
+      "supported": true
+    },
+    {
+      "id": "rib_right_9",
+      "label": "Rib Right 9",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 112,
+      "supported": true
+    },
+    {
+      "id": "rib_right_10",
+      "label": "Rib Right 10",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 113,
+      "supported": true
+    },
+    {
+      "id": "rib_right_11",
+      "label": "Rib Right 11",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 114,
+      "supported": true
+    },
+    {
+      "id": "rib_right_12",
+      "label": "Rib Right 12",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 115,
+      "supported": true
+    },
+    {
+      "id": "sternum",
+      "label": "Sternum",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 116,
+      "supported": true
+    },
+    {
+      "id": "costal_cartilages",
+      "label": "Costal Cartilages",
+      "category": "Bones and skeletal structures",
+      "modality": "CT",
+      "task": "total",
+      "class_index": 117,
+      "supported": true
+    }
+  ],
+  "total_mr": [
+    {
+      "id": "spleen",
+      "label": "Spleen",
+      "category": "Abdominal organs",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 1,
+      "supported": true
+    },
+    {
+      "id": "kidney_right",
+      "label": "Right kidney",
+      "category": "Abdominal organs",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 2,
+      "supported": true
+    },
+    {
+      "id": "kidney_left",
+      "label": "Left kidney",
+      "category": "Abdominal organs",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 3,
+      "supported": true
+    },
+    {
+      "id": "gallbladder",
+      "label": "Gallbladder",
+      "category": "Abdominal organs",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 4,
+      "supported": true
+    },
+    {
+      "id": "liver",
+      "label": "Liver",
+      "category": "Abdominal organs",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 5,
+      "supported": true
+    },
+    {
+      "id": "stomach",
+      "label": "Stomach",
+      "category": "Abdominal organs",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 6,
+      "supported": true
+    },
+    {
+      "id": "pancreas",
+      "label": "Pancreas",
+      "category": "Abdominal organs",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 7,
+      "supported": true
+    },
+    {
+      "id": "adrenal_gland_right",
+      "label": "Right Adrenal Gland",
+      "category": "Abdominal organs",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 8,
+      "supported": true
+    },
+    {
+      "id": "adrenal_gland_left",
+      "label": "Left Adrenal Gland",
+      "category": "Abdominal organs",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 9,
+      "supported": true
+    },
+    {
+      "id": "lung_left",
+      "label": "Left Lung",
+      "category": "Thoracic organs",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 10,
+      "supported": true
+    },
+    {
+      "id": "lung_right",
+      "label": "Right Lung",
+      "category": "Thoracic organs",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 11,
+      "supported": true
+    },
+    {
+      "id": "esophagus",
+      "label": "Esophagus",
+      "category": "Thoracic organs",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 12,
+      "supported": true
+    },
+    {
+      "id": "small_bowel",
+      "label": "Small Bowel",
+      "category": "Abdominal organs",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 13,
+      "supported": true
+    },
+    {
+      "id": "duodenum",
+      "label": "Duodenum",
+      "category": "Abdominal organs",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 14,
+      "supported": true
+    },
+    {
+      "id": "colon",
+      "label": "Colon",
+      "category": "Abdominal organs",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 15,
+      "supported": true
+    },
+    {
+      "id": "urinary_bladder",
+      "label": "Urinary Bladder",
+      "category": "Abdominal organs",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 16,
+      "supported": true
+    },
+    {
+      "id": "prostate",
+      "label": "Prostate",
+      "category": "Abdominal organs",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 17,
+      "supported": true
+    },
+    {
+      "id": "sacrum",
+      "label": "Sacrum",
+      "category": "Bones and skeletal structures",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 18,
+      "supported": true
+    },
+    {
+      "id": "vertebrae",
+      "label": "Vertebrae",
+      "category": "Bones and skeletal structures",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 19,
+      "supported": true
+    },
+    {
+      "id": "intervertebral_discs",
+      "label": "Intervertebral Discs",
+      "category": "Bones and skeletal structures",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 20,
+      "supported": true
+    },
+    {
+      "id": "spinal_cord",
+      "label": "Spinal Cord",
+      "category": "Brain and head structures",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 21,
+      "supported": true
+    },
+    {
+      "id": "heart",
+      "label": "Heart",
+      "category": "Thoracic organs",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 22,
+      "supported": true
+    },
+    {
+      "id": "aorta",
+      "label": "Aorta",
+      "category": "Blood vessels",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 23,
+      "supported": true
+    },
+    {
+      "id": "inferior_vena_cava",
+      "label": "Inferior vena cava",
+      "category": "Blood vessels",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 24,
+      "supported": true
+    },
+    {
+      "id": "portal_vein_and_splenic_vein",
+      "label": "Portal and splenic vein",
+      "category": "Blood vessels",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 25,
+      "supported": true
+    },
+    {
+      "id": "iliac_artery_left",
+      "label": "Left Iliac Artery",
+      "category": "Blood vessels",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 26,
+      "supported": true
+    },
+    {
+      "id": "iliac_artery_right",
+      "label": "Right Iliac Artery",
+      "category": "Blood vessels",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 27,
+      "supported": true
+    },
+    {
+      "id": "iliac_vena_left",
+      "label": "Left Iliac Vena",
+      "category": "Blood vessels",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 28,
+      "supported": true
+    },
+    {
+      "id": "iliac_vena_right",
+      "label": "Right Iliac Vena",
+      "category": "Blood vessels",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 29,
+      "supported": true
+    },
+    {
+      "id": "humerus_left",
+      "label": "Left Humerus",
+      "category": "Bones and skeletal structures",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 30,
+      "supported": true
+    },
+    {
+      "id": "humerus_right",
+      "label": "Right Humerus",
+      "category": "Bones and skeletal structures",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 31,
+      "supported": true
+    },
+    {
+      "id": "scapula_left",
+      "label": "Left Scapula",
+      "category": "Bones and skeletal structures",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 32,
+      "supported": true
+    },
+    {
+      "id": "scapula_right",
+      "label": "Right Scapula",
+      "category": "Bones and skeletal structures",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 33,
+      "supported": true
+    },
+    {
+      "id": "clavicula_left",
+      "label": "Left Clavicula",
+      "category": "Bones and skeletal structures",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 34,
+      "supported": true
+    },
+    {
+      "id": "clavicula_right",
+      "label": "Right Clavicula",
+      "category": "Bones and skeletal structures",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 35,
+      "supported": true
+    },
+    {
+      "id": "femur_left",
+      "label": "Left Femur",
+      "category": "Bones and skeletal structures",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 36,
+      "supported": true
+    },
+    {
+      "id": "femur_right",
+      "label": "Right Femur",
+      "category": "Bones and skeletal structures",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 37,
+      "supported": true
+    },
+    {
+      "id": "hip_left",
+      "label": "Left Hip",
+      "category": "Bones and skeletal structures",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 38,
+      "supported": true
+    },
+    {
+      "id": "hip_right",
+      "label": "Right Hip",
+      "category": "Bones and skeletal structures",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 39,
+      "supported": true
+    },
+    {
+      "id": "gluteus_maximus_left",
+      "label": "Left Gluteus Maximus",
+      "category": "Muscles",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 40,
+      "supported": true
+    },
+    {
+      "id": "gluteus_maximus_right",
+      "label": "Right Gluteus Maximus",
+      "category": "Muscles",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 41,
+      "supported": true
+    },
+    {
+      "id": "gluteus_medius_left",
+      "label": "Left Gluteus Medius",
+      "category": "Muscles",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 42,
+      "supported": true
+    },
+    {
+      "id": "gluteus_medius_right",
+      "label": "Right Gluteus Medius",
+      "category": "Muscles",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 43,
+      "supported": true
+    },
+    {
+      "id": "gluteus_minimus_left",
+      "label": "Left Gluteus Minimus",
+      "category": "Muscles",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 44,
+      "supported": true
+    },
+    {
+      "id": "gluteus_minimus_right",
+      "label": "Right Gluteus Minimus",
+      "category": "Muscles",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 45,
+      "supported": true
+    },
+    {
+      "id": "autochthon_left",
+      "label": "Left Autochthon",
+      "category": "Muscles",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 46,
+      "supported": true
+    },
+    {
+      "id": "autochthon_right",
+      "label": "Right Autochthon",
+      "category": "Muscles",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 47,
+      "supported": true
+    },
+    {
+      "id": "iliopsoas_left",
+      "label": "Left Iliopsoas",
+      "category": "Muscles",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 48,
+      "supported": true
+    },
+    {
+      "id": "iliopsoas_right",
+      "label": "Right Iliopsoas",
+      "category": "Muscles",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 49,
+      "supported": true
+    },
+    {
+      "id": "brain",
+      "label": "Brain",
+      "category": "Brain and head structures",
+      "modality": "MR",
+      "task": "total_mr",
+      "class_index": 50,
+      "supported": true
+    }
+  ]
+}
