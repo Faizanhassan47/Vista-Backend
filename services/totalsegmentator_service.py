@@ -129,17 +129,67 @@ def _env(name, default=""):
     return default
 
 
+def project_root():
+    return Path(__file__).resolve().parents[2]
+
+
+def weights_dir():
+    """nnUNet results directory. Relative config is resolved from the project root."""
+    configured = _env("TOTALSEG_WEIGHTS_PATH").strip()
+    if not configured:
+        path = project_root() / "Ai models" / "totalsegmentator" / "models"
+    else:
+        path = Path(configured)
+        if not path.is_absolute():
+            path = project_root() / path
+    return path.resolve()
+
+
+REQUIRED_WEIGHTS = (
+    "Dataset297_TotalSegmentator_total_3mm_1559subj/nnUNetTrainer_4000epochs_NoMirroring__nnUNetPlans__3d_fullres/fold_0/checkpoint_final.pth",
+    "Dataset297_TotalSegmentator_total_3mm_1559subj/nnUNetTrainer_4000epochs_NoMirroring__nnUNetPlans__3d_fullres/plans.json",
+    "Dataset297_TotalSegmentator_total_3mm_1559subj/nnUNetTrainer_4000epochs_NoMirroring__nnUNetPlans__3d_fullres/dataset.json",
+    "Dataset298_TotalSegmentator_total_6mm_1559subj/nnUNetTrainer_4000epochs_NoMirroring__nnUNetPlans__3d_fullres/fold_0/checkpoint_final.pth",
+    "Dataset298_TotalSegmentator_total_6mm_1559subj/nnUNetTrainer_4000epochs_NoMirroring__nnUNetPlans__3d_fullres/plans.json",
+    "Dataset298_TotalSegmentator_total_6mm_1559subj/nnUNetTrainer_4000epochs_NoMirroring__nnUNetPlans__3d_fullres/dataset.json",
+    "Dataset852_TotalSegMRI_total_3mm_1088subj/nnUNetTrainer_2000epochs_NoMirroring__nnUNetPlans__3d_fullres/fold_0/checkpoint_final.pth",
+    "Dataset852_TotalSegMRI_total_3mm_1088subj/nnUNetTrainer_2000epochs_NoMirroring__nnUNetPlans__3d_fullres/plans.json",
+    "Dataset852_TotalSegMRI_total_3mm_1088subj/nnUNetTrainer_2000epochs_NoMirroring__nnUNetPlans__3d_fullres/dataset.json",
+)
+
+
+def missing_weights():
+    root = weights_dir()
+    return [item for item in REQUIRED_WEIGHTS if not (root / item).is_file() or (root / item).stat().st_size < 1024]
+
+
 def settings():
     root = Path(__file__).resolve().parents[1]
     work = _env("TOTALSEG_WORK_DIR") or str(root / "storage" / "totalsegmentator")
     return {
         "python": _env("TOTALSEG_PYTHON").strip(),
         "work_dir": work,
+        "weights_dir": str(weights_dir()),
         "threads": max(1, int(_env("TOTALSEG_THREADS", "4") or 4)),
         "timeout_seconds": max(60, int(_env("TOTALSEG_TIMEOUT_SECONDS", "900") or 900)),
         "fast": _env("TOTALSEG_FAST", "1") != "0",
         "model_version": MODEL_VERSION,
     }
+
+
+def worker_env(base=None):
+    """Environment for the TotalSegmentator process. Checkpoints come from the project tree."""
+    env = dict(os.environ if base is None else base)
+    config = settings()
+    weights = config["weights_dir"]
+    home = str(Path(config["work_dir"]) / "runtime-home")
+    env["TOTALSEG_WEIGHTS_PATH"] = weights
+    env["TOTALSEG_HOME_DIR"] = home
+    env["nnUNet_results"] = weights
+    env["nnUNet_raw"] = weights
+    env["nnUNet_preprocessed"] = weights
+    env["OMP_NUM_THREADS"] = str(config["threads"])
+    return env
 
 
 def apply_modality_verification(metadata, modality, username, verified_at):
@@ -195,6 +245,12 @@ def normalize_rois(requested, task="total"):
 def command(python, source, output_dir, task, rois, fast=True):
     if not python:
         raise TotalSegmentatorError("TotalSegmentator Python is not configured", "not_configured")
+    missing = missing_weights()
+    if missing:
+        raise TotalSegmentatorError(
+            "Project TotalSegmentator weights are incomplete: " + ", ".join(missing[:3]),
+            "missing_weights",
+        )
     argv = [
         python, "-m", "totalsegmentator.bin.TotalSegmentator",
         "-i", str(source),

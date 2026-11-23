@@ -23,6 +23,7 @@ from services.totalsegmentator_service import (
     normalize_rois,
     settings,
     task_for_modality,
+    worker_env,
 )
 
 _LOCK = threading.Lock()
@@ -148,8 +149,7 @@ def _run(job_id):
             job["stage"] = "Running inference"
         _persist(job)
         argv = command(config["python"], job["input_path"], output, job["task"], job["rois"], config["fast"])
-        env = os.environ.copy()
-        env["OMP_NUM_THREADS"] = str(config["threads"])
+        env = worker_env()
         with log_path.open("w", encoding="utf-8") as log:
             completed = subprocess.run(
                 argv,
