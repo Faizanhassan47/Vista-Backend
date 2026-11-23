@@ -20,6 +20,19 @@ from services.totalsegmentator_service import (
 ROOT = Path(r"E:\total-segmentation")
 
 
+def test_weights_resolve_inside_the_project():
+    from services.totalsegmentator_service import missing_weights, weights_dir, worker_env
+    path = weights_dir()
+    assert path.name == "models"
+    assert path.parent.name == "totalsegmentator"
+    assert ".totalsegmentator" not in path.parts
+    assert missing_weights() == []
+    env = worker_env({})
+    assert env["TOTALSEG_WEIGHTS_PATH"] == str(path)
+    assert env["nnUNet_results"] == str(path)
+    assert ".totalsegmentator" not in env["TOTALSEG_HOME_DIR"]
+
+
 def test_modality_selects_the_verified_task():
     assert task_for_modality("CT") == "total"
     assert task_for_modality("MR") == "total_mr"
