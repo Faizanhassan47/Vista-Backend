@@ -29,12 +29,16 @@ from routes.grandqc_api import create_grandqc_router
 from routes.dip_api import create_dip_router
 from routes.ai_evidence_api import create_ai_evidence_router
 from routes.ai_fusion_api import create_ai_fusion_router
+from routes.neuromri_api import create_neuromri_router
+from routes.totalsegmentator_api import create_totalsegmentator_router
 
 from services.ai_engine import init_ai_schema
 from services.kongnet_engine import init_kongnet_schema
 from services.grandqc_repository import init_grandqc_schema
 from services.ai_evidence_service import init_ai_evidence_schema
 from services.ai_fusion_service import init_ai_fusion_schema
+from services.neuromri_engine import init_neuromri_catalog
+from services.totalsegmentator_service import init_totalsegmentator_catalog
 
 logger = logging.getLogger("pathology.routes")
 
@@ -90,6 +94,14 @@ def init_all_schemas(connect_fn):
     except Exception:
         logger.exception(
             "AI Fusion schema initialization failed"
+        )
+
+    try:
+        init_neuromri_catalog(connect_fn)
+        init_totalsegmentator_catalog(connect_fn)
+    except Exception:
+        logger.exception(
+            "NeuroMRI catalog registration failed"
         )
 
 
@@ -248,6 +260,31 @@ def create_api_router(
                 get_slide_func=get_slide_fn,
                 get_case_func=get_case_fn,
                 require_assigned_case_func=require_assigned_case_fn,
+            )
+        )
+
+        master_router.include_router(
+            create_neuromri_router(
+                connect_func=connect_fn,
+                require_roles_func=require_roles_fn,
+                get_current_user_func=get_current_user_fn,
+                get_slide_func=get_slide_fn,
+                get_case_func=get_case_fn,
+                stored_path_func=stored_path_fn,
+                require_assigned_case_func=require_assigned_case_fn,
+                audit_func=audit_fn,
+            )
+        )
+        master_router.include_router(
+            create_totalsegmentator_router(
+                connect_func=connect_fn,
+                require_roles_func=require_roles_fn,
+                get_current_user_func=get_current_user_fn,
+                get_slide_func=get_slide_fn,
+                get_case_func=get_case_fn,
+                stored_path_func=stored_path_fn,
+                require_assigned_case_func=require_assigned_case_fn,
+                audit_func=audit_fn,
             )
         )
 
