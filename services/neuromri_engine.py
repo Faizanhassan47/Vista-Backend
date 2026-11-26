@@ -145,7 +145,10 @@ def get_model():
 
 
 def predict_image(image, source):
-    import torch
+    try:
+        import torch
+    except ImportError as exc:
+        raise NeuromriUnavailable("PyTorch is not available for NeuroMRI") from exc
 
     started = time.perf_counter()
     model = get_model()

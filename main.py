@@ -57,14 +57,22 @@ async def lifespan(_app):
     from routes.platform_api import watched_folder_loop
     from services.ai_engine import hovernet_manager
     from services.kongnet_engine import kongnet_manager
+    from services.job_queue import init_job_queue_schema
+    from services.job_queue_worker import job_queue_loop
 
     stop_event = asyncio.Event()
+    try:
+        init_job_queue_schema(connect)
+    except Exception:
+        logging.getLogger("pathology.api").exception("background_jobs schema init failed")
     watcher = asyncio.create_task(watched_folder_loop(connect, stop_event))
+    queue_worker = asyncio.create_task(job_queue_loop(connect, stop_event))
     try:
         yield
     finally:
         stop_event.set()
         await watcher
+        await queue_worker
         slide_cache.clear()
         hovernet_manager.stop_worker()
         kongnet_manager.stop_worker()
@@ -77,23 +85,21 @@ from middleware import (
     AuthAccessMiddleware,
     CSRFMiddleware,
     ObservabilityMiddleware,
+    RateLimitMiddleware,
     SecurityHeadersMiddleware,
 )
 
-# 1. Observability, correlation IDs, and client IP detection
+# Innermost first: observability, then auth/CSRF/security, then rate limit, then CORS.
+# (Last add_middleware is outermost on the request path.)
 app.add_middleware(ObservabilityMiddleware)
-
-# 2. User authentication & token inspection
 app.add_middleware(AuthAccessMiddleware)
-
-# 3. Cross-Site Request Forgery protection
 app.add_middleware(CSRFMiddleware)
-
-# 4. Conservative browser security headers. CSP/HSTS are deployment concerns
+# Conservative browser security headers. CSP/HSTS are deployment concerns
 # and must be configured only after the production HTTPS/topology is known.
 app.add_middleware(SecurityHeadersMiddleware)
+# Per-IP sliding-window rate limits (runs before auth on the request path; nginx can also rate-limit)
+app.add_middleware(RateLimitMiddleware)
 
-# 5. CORS configuration
 import os
 app.add_middleware(
     CORSMiddleware,
