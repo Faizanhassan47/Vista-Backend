@@ -31,8 +31,10 @@ from routes.ai_evidence_api import create_ai_evidence_router
 from routes.ai_fusion_api import create_ai_fusion_router
 from routes.neuromri_api import create_neuromri_router
 from routes.totalsegmentator_api import create_totalsegmentator_router
+from routes.queue_api import create_queue_router
 
 from services.ai_engine import init_ai_schema
+from services.job_queue import init_job_queue_schema
 from services.kongnet_engine import init_kongnet_schema
 from services.grandqc_repository import init_grandqc_schema
 from services.ai_evidence_service import init_ai_evidence_schema
@@ -104,6 +106,11 @@ def init_all_schemas(connect_fn):
             "NeuroMRI catalog registration failed"
         )
 
+    try:
+        init_job_queue_schema(connect_fn)
+    except Exception:
+        logger.exception("background_jobs schema initialization failed")
+
 
 def create_api_router(
     connect_fn,
@@ -145,6 +152,14 @@ def create_api_router(
             require_roles=require_roles_fn,
             get_current_user=get_current_user_fn,
             audit=audit_fn,
+        )
+    )
+
+    master_router.include_router(
+        create_queue_router(
+            connect=connect_fn,
+            require_roles=require_roles_fn,
+            get_current_user=get_current_user_fn,
         )
     )
 
