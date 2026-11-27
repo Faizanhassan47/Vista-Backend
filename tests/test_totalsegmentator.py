@@ -31,6 +31,32 @@ def test_weights_resolve_inside_the_project():
     assert env["TOTALSEG_WEIGHTS_PATH"] == str(path)
     assert env["nnUNet_results"] == str(path)
     assert ".totalsegmentator" not in env["TOTALSEG_HOME_DIR"]
+    assert env["MPLBACKEND"] == "Agg"
+    assert env["MPLCONFIGDIR"]
+
+
+def test_recover_stale_jobs_marks_orphaned_running(tmp_path, monkeypatch):
+    import json
+    from services import totalsegmentator_jobs as jobs
+
+    monkeypatch.setenv("TOTALSEG_WORK_DIR", str(tmp_path))
+    jobs._JOBS.clear()
+    jobs._ACTIVE = None
+    jobs._STALE_RECOVERED = False
+    folder = tmp_path / "deadbeef"
+    folder.mkdir()
+    payload = {
+        "job_id": "deadbeef",
+        "status": "running",
+        "stage": "Running inference",
+        "slide_id": 1,
+        "started_at": "2026-01-01T00:00:00+00:00",
+    }
+    (folder / "job.json").write_text(json.dumps(payload), encoding="utf-8")
+    assert jobs.recover_stale_jobs() == 1
+    restored = json.loads((folder / "job.json").read_text(encoding="utf-8"))
+    assert restored["status"] == "failed"
+    assert "restarted" in restored["error"].lower()
 
 
 def test_modality_selects_the_verified_task():

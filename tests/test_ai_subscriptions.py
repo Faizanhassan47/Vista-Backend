@@ -436,6 +436,7 @@ def test_only_super_administrator_can_publish_and_remove_catalog_cards(ai_user):
             "catalog_purpose": "Test purpose",
             "catalog_value": "Test clinical value",
             "catalog_outputs": ["Overlay", "Counts"],
+            "catalog_workspaces": ["pathology", "radiology"],
             "catalog_session_price_usd": "12.50",
             "catalog_usd_to_pkr_rate": "280",
         },
@@ -451,6 +452,7 @@ def test_only_super_administrator_can_publish_and_remove_catalog_cards(ai_user):
 
     assert stored["catalog_summary"] == "Test catalog summary"
     assert stored["catalog_outputs_json"] == '["Overlay", "Counts"]'
+    assert stored["catalog_workspaces"] == ["pathology", "radiology"]
     assert stored["catalog_title"] == "HoVer-Net Nuclei Analysis"
     assert stored["catalog_display_order"] == 3
     assert float(stored["catalog_session_price_usd"]) == 12.5

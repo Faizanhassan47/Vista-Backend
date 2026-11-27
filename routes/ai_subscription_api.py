@@ -43,6 +43,7 @@ class FeatureStatusUpdate(BaseModel):
     catalog_purpose: str | None = Field(default=None, max_length=1000)
     catalog_value: str | None = Field(default=None, max_length=1000)
     catalog_outputs: list[str] | None = Field(default=None, max_length=8)
+    catalog_workspaces: list[str] | None = Field(default=None, max_length=4)
 
 
 class FeaturePreferenceUpdate(BaseModel):
@@ -120,6 +121,16 @@ def create_ai_subscription_router(connect, require_roles, get_current_user, audi
             if "catalog_outputs" in values:
                 outputs = [output.strip() for output in values.pop("catalog_outputs") if output.strip()]
                 values["catalog_outputs_json"] = json.dumps(outputs)
+            if "catalog_workspaces" in values:
+                allowed_workspaces = {"pathology", "radiology"}
+                workspaces = []
+                for workspace in values.pop("catalog_workspaces") or []:
+                    key = str(workspace).strip().lower()
+                    if key in allowed_workspaces and key not in workspaces:
+                        workspaces.append(key)
+                if not workspaces:
+                    raise HTTPException(400, "Select at least one workspace")
+                values["catalog_workspaces_json"] = json.dumps(workspaces)
             if "catalog_session_price_usd" in values:
                 rate = values.get("catalog_usd_to_pkr_rate", Decimal("280"))
                 values["catalog_session_price_pkr"] = (values["catalog_session_price_usd"] * rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
@@ -128,7 +139,7 @@ def create_ai_subscription_router(connect, require_roles, get_current_user, audi
                     values[key] = 1 if values[key] else 0
             if values.get("catalog_title") and not values.get("is_catalog_deleted"):
                 values["is_implemented"] = 1
-            allowed = {"is_active", "is_catalog_visible", "is_featured", "is_catalog_deleted", "is_implemented", "catalog_title", "catalog_display_order", "catalog_category", "catalog_summary", "catalog_purpose", "catalog_value", "catalog_outputs_json", "catalog_session_price_usd", "catalog_usd_to_pkr_rate", "catalog_session_price_pkr"}
+            allowed = {"is_active", "is_catalog_visible", "is_featured", "is_catalog_deleted", "is_implemented", "catalog_title", "catalog_display_order", "catalog_category", "catalog_summary", "catalog_purpose", "catalog_value", "catalog_outputs_json", "catalog_workspaces_json", "catalog_session_price_usd", "catalog_usd_to_pkr_rate", "catalog_session_price_pkr"}
             if set(values) - allowed:
                 raise HTTPException(400, "Unsupported catalog field")
             assignments = ",".join(f"{key}=?" for key in values)

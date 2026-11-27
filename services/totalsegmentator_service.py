@@ -171,7 +171,8 @@ def settings():
         "work_dir": work,
         "weights_dir": str(weights_dir()),
         "threads": max(1, int(_env("TOTALSEG_THREADS", "4") or 4)),
-        "timeout_seconds": max(60, int(_env("TOTALSEG_TIMEOUT_SECONDS", "900") or 900)),
+        # CPU TotalSegmentator (especially total_mr) routinely needs >15 minutes.
+        "timeout_seconds": max(60, int(_env("TOTALSEG_TIMEOUT_SECONDS", "3600") or 3600)),
         "fast": _env("TOTALSEG_FAST", "1") != "0",
         "model_version": MODEL_VERSION,
     }
@@ -182,13 +183,21 @@ def worker_env(base=None):
     env = dict(os.environ if base is None else base)
     config = settings()
     weights = config["weights_dir"]
-    home = str(Path(config["work_dir"]) / "runtime-home")
+    work = Path(config["work_dir"])
+    home = str(work / "runtime-home")
+    mpl_config = work / "mplconfig"
+    mpl_config.mkdir(parents=True, exist_ok=True)
+    Path(home).mkdir(parents=True, exist_ok=True)
     env["TOTALSEG_WEIGHTS_PATH"] = weights
     env["TOTALSEG_HOME_DIR"] = home
     env["nnUNet_results"] = weights
     env["nnUNet_raw"] = weights
     env["nnUNet_preprocessed"] = weights
     env["OMP_NUM_THREADS"] = str(config["threads"])
+    # Avoid first-run matplotlib font-cache builds eating the whole job timeout.
+    env["MPLBACKEND"] = "Agg"
+    env["MPLCONFIGDIR"] = str(mpl_config)
+    env["HOME"] = home
     return env
 
 

@@ -2,7 +2,7 @@
 
 from collections import deque
 
-from middleware.rate_limit import RateLimitMiddleware, _bucket_for
+from middleware.rate_limit import RateLimitMiddleware, _bucket_for, _is_exempt
 from services.job_queue import register_handler, worker_id
 
 
@@ -11,6 +11,17 @@ def test_rate_limit_buckets():
     assert _bucket_for("/api/ai/neuromri/predict", "POST") == "ai"
     assert _bucket_for("/api/cases", "POST") == "write"
     assert _bucket_for("/api/cases", "GET") == "default"
+
+
+def test_viewer_tile_paths_are_rate_limit_exempt():
+    assert _is_exempt("/api/slides/13064/slide_files/12/7_7.jpeg")
+    assert _is_exempt("/api/slides/13064/slide.dzi")
+    assert _is_exempt("/api/slides/9/radiology/frame")
+    assert _is_exempt("/api/slides/9/thumbnail")
+    assert _is_exempt("/api/ai/jobs/job-70fe9813e1ca")
+    assert _is_exempt("/api/ai/totalsegmentator/jobs/abc")
+    assert not _is_exempt("/api/cases")
+    assert not _is_exempt("/api/ai/neuromri/predict")
 
 
 def test_rate_limit_allow_then_block(monkeypatch):

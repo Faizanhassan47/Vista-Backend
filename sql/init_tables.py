@@ -72,8 +72,22 @@ def init_db(connect_fn):
             "catalog_session_price_usd": "DECIMAL(12,2) NULL",
             "catalog_usd_to_pkr_rate": "DECIMAL(12,4) NULL",
             "catalog_session_price_pkr": "DECIMAL(14,2) NULL",
+            "catalog_workspaces_json": "NVARCHAR(500) NULL",
         }.items():
             db.execute(f"IF COL_LENGTH('ai_features','{column_name}') IS NULL ALTER TABLE ai_features ADD {column_name} {definition}")
+        # Radiology-only integrations default to the DICOM/NIfTI workstation.
+        db.execute("""
+            UPDATE ai_features
+            SET catalog_workspaces_json='[\"radiology\"]'
+            WHERE feature_code IN ('NEUROMRI_SLICE_CLASSIFICATION','TOTALSEGMENTATOR')
+              AND (catalog_workspaces_json IS NULL OR LTRIM(RTRIM(catalog_workspaces_json))='')
+        """)
+        db.execute("""
+            UPDATE ai_features
+            SET catalog_workspaces_json='[\"pathology\"]'
+            WHERE feature_code NOT IN ('NEUROMRI_SLICE_CLASSIFICATION','TOTALSEGMENTATOR')
+              AND (catalog_workspaces_json IS NULL OR LTRIM(RTRIM(catalog_workspaces_json))='')
+        """)
         db.execute("""UPDATE ai_features SET is_implemented=1
             WHERE catalog_title IS NOT NULL AND LTRIM(RTRIM(catalog_title))<>'' AND is_catalog_deleted=0 AND is_implemented=0""")
         db.execute("""

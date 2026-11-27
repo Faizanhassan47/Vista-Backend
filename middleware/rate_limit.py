@@ -48,6 +48,26 @@ def _bucket_for(path: str, method: str) -> str:
     return "default"
 
 
+def _is_exempt(path: str) -> bool:
+    """High-frequency viewer assets must not compete with API rate buckets."""
+    if path in {"/api/status", "/docs", "/openapi.json", "/redoc", "/favicon.ico"}:
+        return True
+    lower = path.lower()
+    # OpenSeadragon Deep Zoom tiles / descriptor (many GETs per zoom)
+    if "/slide_files/" in lower or lower.endswith(".dzi") or "/slide.dzi" in lower:
+        return True
+    # Radiology slice / mask / volume GETs during MPR/pan
+    if "/radiology/frame" in lower or "/radiology/hu-mask" in lower or "/radiology/volume" in lower:
+        return True
+    # Thumbnails in the slide tray
+    if "/thumbnail" in lower and lower.startswith("/api/slides/"):
+        return True
+    # AI / TotalSeg job status polling (frequent GETs while a job runs)
+    if lower.startswith("/api/ai/jobs/") or "/totalsegmentator/jobs/" in lower:
+        return True
+    return False
+
+
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """Rejects abusive clients with HTTP 429 and Retry-After."""
 
@@ -80,7 +100,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         path = request.url.path or "/"
-        if path in {"/api/status", "/docs", "/openapi.json", "/redoc", "/favicon.ico"}:
+        if _is_exempt(path):
             return await call_next(request)
 
         bucket = _bucket_for(path, request.method)

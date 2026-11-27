@@ -65,6 +65,13 @@ async def lifespan(_app):
         init_job_queue_schema(connect)
     except Exception:
         logging.getLogger("pathology.api").exception("background_jobs schema init failed")
+    try:
+        from services.totalsegmentator_jobs import recover_stale_jobs
+        recovered = recover_stale_jobs()
+        if recovered:
+            logging.getLogger("pathology.api").warning("Recovered %s interrupted TotalSegmentator job(s)", recovered)
+    except Exception:
+        logging.getLogger("pathology.api").exception("TotalSegmentator stale-job recovery failed")
     watcher = asyncio.create_task(watched_folder_loop(connect, stop_event))
     queue_worker = asyncio.create_task(job_queue_loop(connect, stop_event))
     try:
