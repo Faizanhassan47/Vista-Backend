@@ -24,6 +24,10 @@ def utcnow_naive():
 
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
+RADIOLOGY_ONLY_CODES = {"NEUROMRI_SLICE_CLASSIFICATION", "TOTALSEGMENTATOR"}
+VALID_WORKSPACES = {"pathology", "radiology"}
+
+
 class AISubscriptionService:
 
     """IsPremium is a synchronized cache; authorization always uses joined subscription data."""
@@ -31,6 +35,23 @@ class AISubscriptionService:
     def __init__(self, connect):
 
         self.connect = connect
+
+    @staticmethod
+    def _parse_workspaces(raw, feature_code=None):
+        import json
+        workspaces = []
+        try:
+            parsed = json.loads(raw or "[]")
+            if isinstance(parsed, list):
+                workspaces = [str(item).strip().lower() for item in parsed if str(item).strip()]
+        except (TypeError, ValueError, json.JSONDecodeError):
+            workspaces = []
+        workspaces = [item for item in workspaces if item in VALID_WORKSPACES]
+        if workspaces:
+            return workspaces
+        if feature_code in RADIOLOGY_ONLY_CODES:
+            return ["radiology"]
+        return ["pathology"]
 
     def expire_due_subscriptions(self, db=None):
 
@@ -78,7 +99,7 @@ class AISubscriptionService:
 
                        f.catalog_display_order, f.is_catalog_deleted, f.catalog_session_price_usd,
 
-                       f.catalog_usd_to_pkr_rate, f.catalog_session_price_pkr,
+                       f.catalog_usd_to_pkr_rate, f.catalog_session_price_pkr, f.catalog_workspaces_json,
 
                        COALESCE(p.is_enabled,1) AS user_enabled,
 
@@ -111,6 +132,8 @@ class AISubscriptionService:
                 item = dict(row)
 
                 code = item["feature_code"]
+
+                item["catalog_workspaces"] = self._parse_workspaces(item.get("catalog_workspaces_json"), code)
 
                 if code not in unique or item["is_entitled"]:
 

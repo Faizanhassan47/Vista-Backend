@@ -29,6 +29,7 @@ from services.totalsegmentator_service import (
 _LOCK = threading.Lock()
 _JOBS = {}
 _ACTIVE = None
+_STALE_RECOVERED = False
 
 
 def _now():
@@ -46,7 +47,60 @@ def _public(job):
     return {key: value for key, value in job.items() if key not in hidden}
 
 
+def _mark_failed(job, message):
+    job["status"] = "failed"
+    job["stage"] = "Failed"
+    job["error"] = message
+    job["finished_at"] = _now()
+    if job.get("runtime_seconds") is None and job.get("started_at"):
+        try:
+            started = datetime.fromisoformat(job["started_at"])
+            job["runtime_seconds"] = round((datetime.now(timezone.utc) - started).total_seconds(), 2)
+        except ValueError:
+            job["runtime_seconds"] = None
+
+
+def recover_stale_jobs():
+    """Mark orphaned queued/running jobs failed after API restart (daemon threads die)."""
+    global _ACTIVE, _STALE_RECOVERED
+    root = _work()
+    if not root.is_dir():
+        _STALE_RECOVERED = True
+        return 0
+    recovered = 0
+    with _LOCK:
+        active = _ACTIVE
+        for path in root.glob("*/job.json"):
+            try:
+                job = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            job_id = job.get("job_id") or path.parent.name
+            if job.get("status") not in {"queued", "running"}:
+                continue
+            if active and job_id == active:
+                continue
+            _mark_failed(
+                job,
+                "Segmentation was interrupted when the API restarted. Run segmentation again.",
+            )
+            path.write_text(json.dumps(job, indent=2), encoding="utf-8")
+            _JOBS[job_id] = job
+            recovered += 1
+        if active and active not in _JOBS:
+            # Active id from a previous process cannot survive restart.
+            _ACTIVE = None
+        _STALE_RECOVERED = True
+    return recovered
+
+
+def _ensure_recovered():
+    if not _STALE_RECOVERED:
+        recover_stale_jobs()
+
+
 def get_job(job_id):
+    _ensure_recovered()
     with _LOCK:
         job = _JOBS.get(job_id)
     if job:
@@ -61,6 +115,7 @@ def get_job(job_id):
 
 
 def latest_for_slide(slide_id):
+    _ensure_recovered()
     root = _work()
     found = []
     if not root.is_dir():
@@ -80,6 +135,7 @@ def latest_for_slide(slide_id):
 
 def start_job(slide, source_nifti, modality, rois, user):
     global _ACTIVE
+    _ensure_recovered()
     task = task_for_modality(modality)
     selected = normalize_rois(rois)
     config = settings()
@@ -221,8 +277,14 @@ def aligned_labels(job_id, rois):
     import nibabel as nib
 
     job = _job_file(job_id)
-    selected = tuple(normalize_rois(rois or job["rois"], job.get("task") or "total"))
+    requested = normalize_rois(rois or job.get("generated_rois") or job["rois"], job.get("task") or "total")
     output = Path(job["output_dir"])
+    # Only ROIs that actually have mask files — UI may still list structures
+    # that were unchecked/deselected after a previous run.
+    selected = tuple(roi for roi in requested if (output / f"{roi}.nii.gz").is_file())
+    if not selected:
+        available = tuple(roi for roi in (job.get("generated_rois") or job.get("rois") or []) if (output / f"{roi}.nii.gz").is_file())
+        selected = available
     stamp = tuple((output / f"{roi}.nii.gz").stat().st_mtime_ns for roi in selected)
     key = (job_id, selected, stamp)
     cached = _LABEL_CACHE.get(key)
@@ -233,8 +295,6 @@ def aligned_labels(job_id, rois):
     labels = np.zeros(shape, dtype=np.uint8)
     for label_id, roi in enumerate(selected, start=1):
         path = output / f"{roi}.nii.gz"
-        if not path.is_file():
-            continue
         mask = nib.load(str(path))
         data = np.asanyarray(mask.dataobj)
         if tuple(int(size) for size in data.shape[:3]) != shape:
